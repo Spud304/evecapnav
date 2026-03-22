@@ -1,0 +1,32 @@
+[project]
+name = "evecapnav"
+version = "0.1.0"
+description = "No-auth capital ship jump route planner for EVE Online"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "flask>=3.1",
+    "flask-sqlalchemy>=3.1",
+    "celery[redis]>=5.4",
+    "requests>=2.32",
+    "gunicorn>=23.0",
+    "gevent>=24.0",
+    "python-dotenv>=1.0",
+    "numpy>=2.0",
+]
+
+[dependency-groups]
+test = [
+    "pytest>=8.0",
+    "responses>=0.25",
+    "playwright>=1.40",
+]
+
+[tool.ruff]
+target-version = "py313"
+
+[tool.ruff.lint]
+ignore = ["E402"]
+
+[tool.ruff.lint.per-file-ignores]
+"migrations/*" = ["ALL"]

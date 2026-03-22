@@ -1,0 +1,35 @@
+import logging
+import os
+
+from celery import shared_task
+
+from src.esi import fetch_system_kills, fetch_system_jumps
+from src.cache import save_esi_kills, save_esi_jumps, load_danger_data, mark_esi_updated
+
+logger = logging.getLogger(__name__)
+
+
+def _instance_path() -> str:
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "instance")
+
+
+def get_danger_data() -> dict[int, dict]:
+    """Get the current danger data from the cache DB."""
+    return load_danger_data(_instance_path())
+
+
+@shared_task
+def poll_system_stats():
+    """Fetch kills and jumps from ESI and save to cache DB."""
+    instance = _instance_path()
+
+    kills = fetch_system_kills()
+    if kills:
+        save_esi_kills(instance, kills)
+
+    jumps = fetch_system_jumps()
+    if jumps:
+        save_esi_jumps(instance, jumps)
+
+    if kills or jumps:
+        mark_esi_updated(instance)

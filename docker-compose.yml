@@ -1,0 +1,48 @@
+services:
+  app:
+    build: .
+    ports:
+      - "6001:6001"
+    environment:
+      - STATIC_DB=sqlite-latest
+      - SECRET_KEY=change-me
+      - CELERY_BROKER_URL=redis://redis:6380/0
+      - CELERY_RESULT_BACKEND=redis://redis:6380/0
+    volumes:
+      - ./src/instance:/app/src/instance
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --port 6380
+    ports:
+      - "6380:6380"
+
+  celery-worker:
+    build: .
+    command: uv run celery -A src.main:celery_app worker --loglevel=info
+    environment:
+      - STATIC_DB=sqlite-latest
+      - SECRET_KEY=change-me
+      - CELERY_BROKER_URL=redis://redis:6380/0
+      - CELERY_RESULT_BACKEND=redis://redis:6380/0
+      - CELERY_WORKER=1
+    volumes:
+      - ./src/instance:/app/src/instance
+    depends_on:
+      - redis
+
+  celery-beat:
+    build: .
+    command: uv run celery -A src.main:celery_app beat --loglevel=info
+    environment:
+      - STATIC_DB=sqlite-latest
+      - SECRET_KEY=change-me
+      - CELERY_BROKER_URL=redis://redis:6380/0
+      - CELERY_RESULT_BACKEND=redis://redis:6380/0
+      - CELERY_WORKER=1
+    volumes:
+      - ./src/instance:/app/src/instance
+    depends_on:
+      - redis
