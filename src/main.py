@@ -18,6 +18,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 STATIC_DB = os.environ.get("STATIC_DB", "sqlite-latest")
+JUMP_DATA_SOURCE = os.environ.get("JUMP_DATA_SOURCE", "esi")
+JUMP_API_URL = os.environ.get("JUMP_API_URL", "http://localhost:8001")
+logger.info("Jump data source: %s%s", JUMP_DATA_SOURCE, f" ({JUMP_API_URL})" if JUMP_DATA_SOURCE == "fastapi" else "")
 
 instance_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "instance")
 app = Application(__name__, instance_path=instance_path)

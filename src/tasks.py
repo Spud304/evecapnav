@@ -3,7 +3,7 @@ import os
 
 from celery import shared_task
 
-from src.esi import fetch_system_kills, fetch_system_jumps
+from src.esi import fetch_system_kills, fetch_system_jumps, fetch_system_jumps_from_api
 from src.cache import save_esi_kills, save_esi_jumps, load_danger_data, mark_esi_updated
 
 logger = logging.getLogger(__name__)
@@ -27,7 +27,12 @@ def poll_system_stats():
     if kills:
         save_esi_kills(instance, kills)
 
-    jumps = fetch_system_jumps()
+    source = os.environ.get("JUMP_DATA_SOURCE", "esi")
+    if source == "fastapi":
+        api_url = os.environ.get("JUMP_API_URL", "http://localhost:8001")
+        jumps = fetch_system_jumps_from_api(api_url)
+    else:
+        jumps = fetch_system_jumps()
     if jumps:
         save_esi_jumps(instance, jumps)
 

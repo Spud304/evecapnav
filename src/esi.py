@@ -42,6 +42,19 @@ def fetch_system_jumps() -> dict[int, int]:
     return {entry["system_id"]: entry.get("ship_jumps", 0) for entry in data}
 
 
+def fetch_system_jumps_from_api(api_url: str) -> dict[int, int]:
+    """Fetch system jumps from FastAPI jump history service. Returns {system_id: ship_jumps}."""
+    try:
+        resp = requests.get(f"{api_url}/api/jumps/current", timeout=10)
+        if resp.status_code != 200:
+            logger.warning("Failed to fetch jumps from API: status=%s", resp.status_code)
+            return {}
+        return {int(k): v for k, v in resp.json().items()}
+    except requests.RequestException as e:
+        logger.warning("Jump API request failed: %s", e)
+        return {}
+
+
 def fetch_sovereignty() -> dict[int, dict]:
     """Fetch sovereignty map. Returns {system_id: {alliance_id, faction_id}}."""
     status, data = esi_get(f"{ESI_BASE_URL}/sovereignty/map/")

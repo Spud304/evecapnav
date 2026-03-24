@@ -79,6 +79,7 @@ def init_route_data(app):
         from src.esi import (
             fetch_system_kills,
             fetch_system_jumps,
+            fetch_system_jumps_from_api,
             fetch_sovereignty,
             fetch_names_batch,
         )
@@ -94,7 +95,12 @@ def init_route_data(app):
                     kills = fetch_system_kills()
                     if kills:
                         save_esi_kills(app.instance_path, kills)
-                    jumps = fetch_system_jumps()
+                    source = os.environ.get("JUMP_DATA_SOURCE", "esi")
+                    if source == "fastapi":
+                        api_url = os.environ.get("JUMP_API_URL", "http://localhost:8001")
+                        jumps = fetch_system_jumps_from_api(api_url)
+                    else:
+                        jumps = fetch_system_jumps()
                     if jumps:
                         save_esi_jumps(app.instance_path, jumps)
                     # Fetch sovereignty
