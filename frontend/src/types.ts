@@ -12,6 +12,7 @@ export interface RouteStep {
   safe_spot_warp: string;
   safe_spot_nearest: string;
   moon_count: number;
+  gate_count: number;
   sov_owner: string;
 }
 
@@ -49,6 +50,7 @@ export interface RouteResult {
   zkill?: Record<number, ZkillSystemStats>;
   quiet_hours?: { start: number; end: number };
   alternatives?: Record<string, AlternativeSystem[]>;
+  jump_data_window?: '1h' | '24h';
   error?: string;
 }
 

@@ -5,6 +5,9 @@ Capital ship jump route planner for EVE Online. No login required — plan safe 
 ## Features
 
 - **A* pathfinding** with multiple routing modes: Safe (avoids danger), Direct (shortest), POS Hopping (prefers moon-rich systems)
+- **Fatigue-aware routing** — distance exponent in cost function penalizes long jumps proportionally to fatigue impact
+- **Dead-end system detection** — systems with only 1 stargate are flagged and preferred in safe mode
+- **Advanced weight tuning** — configurable base system cost, distance exponent, danger/jumps weights, dead-end bonus, and moon bonus
 - **Jump fatigue simulation** with optimized wait time suggestions
 - **Safe spot scoring** — finds the best celestial pair for mid-warp bookmarks, shows distance to nearest probe reference
 - **Sovereignty display** — shows alliance/faction ownership per system, route avoidance by alliance name
@@ -12,7 +15,8 @@ Capital ship jump route planner for EVE Online. No login required — plan safe 
 - **Time zone awareness** — suggests quietest jump window based on historical kill patterns
 - **Fuel calculator** with Jump Fuel Conservation skill support
 - **Alternative system selection** — view and swap in different waypoints at each hop
-- **Route sharing** — copy route as text for Discord/Slack
+- **Route sharing** — copy route as text for Discord/Slack, open in Dotlan jump planner
+- **Optional 24h jump history** — uses aggregated jump data from a FastAPI service instead of ESI's hourly snapshot
 
 ## Quick Start
 

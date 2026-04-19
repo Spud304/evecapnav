@@ -7,10 +7,11 @@ interface Props {
   steps: RouteStep[];
   zkill?: Record<number, ZkillSystemStats>;
   alternatives?: Record<string, AlternativeSystem[]>;
+  jumpDataWindow?: '1h' | '24h';
   onSwap?: (hopIndex: number, altSystemId: number) => void;
 }
 
-export default function RouteTable({ steps, zkill, alternatives, onSwap }: Props) {
+export default function RouteTable({ steps, zkill, alternatives, jumpDataWindow, onSwap }: Props) {
   const [selectedStep, setSelectedStep] = useState<RouteStep | null>(null);
   const [expandedHop, setExpandedHop] = useState<number | null>(null);
 
@@ -27,7 +28,7 @@ export default function RouteTable({ steps, zkill, alternatives, onSwap }: Props
               <th className="p-2">Wait</th>
               <th className="p-2">Fatigue After</th>
               <th className="p-2">Kills/hr</th>
-              <th className="p-2">Jumps/hr</th>
+              <th className="p-2">Jumps/{jumpDataWindow === '24h' ? '24h' : 'hr'}</th>
               <th className="p-2">Moons</th>
               <th className="p-2">Threat Intel</th>
               <th className="p-2">Safe Spot</th>
@@ -68,6 +69,9 @@ export default function RouteTable({ steps, zkill, alternatives, onSwap }: Props
                   </td>
                   <td className="p-2">
                     <span className="font-medium">{step.system_name}</span>
+                    {step.gate_count === 1 && (
+                      <span className="ml-1.5 text-xs text-emerald-500 font-medium">Dead End</span>
+                    )}
                     {step.sov_owner && (
                       <span className="block text-xs text-gray-500">{step.sov_owner}</span>
                     )}

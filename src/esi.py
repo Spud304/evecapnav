@@ -43,15 +43,34 @@ def fetch_system_jumps() -> dict[int, int]:
 
 
 def fetch_system_jumps_from_api(api_url: str) -> dict[int, int]:
-    """Fetch system jumps from FastAPI jump history service. Returns {system_id: ship_jumps}."""
+    """Fetch 24h aggregated system jumps from FastAPI jump history service.
+
+    Calls /api/jumps/history?window=24h and sums all hourly snapshots per system.
+    Returns {system_id: total_ship_jumps_over_24h}.
+    """
     try:
-        resp = requests.get(f"{api_url}/api/jumps/current", timeout=10)
+        resp = requests.get(
+            f"{api_url}/api/jumps/history", params={"window": "24h"}, timeout=30
+        )
         if resp.status_code != 200:
-            logger.warning("Failed to fetch jumps from API: status=%s", resp.status_code)
+            logger.warning(
+                "Failed to fetch jump history from API: status=%s", resp.status_code
+            )
             return {}
-        return {int(k): v for k, v in resp.json().items()}
+        data = resp.json()
+        totals: dict[int, int] = {}
+        for snapshot in data.get("snapshots", []):
+            for sys_id_str, count in snapshot.get("systems", {}).items():
+                sid = int(sys_id_str)
+                totals[sid] = totals.get(sid, 0) + count
+        logger.info(
+            "Aggregated 24h jump data: %d systems from %d snapshots",
+            len(totals),
+            len(data.get("snapshots", [])),
+        )
+        return totals
     except requests.RequestException as e:
-        logger.warning("Jump API request failed: %s", e)
+        logger.warning("Jump API history request failed: %s", e)
         return {}
 
 

@@ -8,8 +8,8 @@ services:
       - SECRET_KEY=change-me
       - CELERY_BROKER_URL=redis://redis:6380/0
       - CELERY_RESULT_BACKEND=redis://redis:6380/0
-      - JUMP_DATA_SOURCE=esi
-      - JUMP_API_URL=http://localhost:8001
+      - JUMP_DATA_SOURCE=fastapi
+      - JUMP_API_URL=${JUMP_API_URL}
     volumes:
       - ./src/instance:/app/src/instance
     depends_on:
@@ -46,8 +46,8 @@ services:
       - CELERY_BROKER_URL=redis://redis:6380/0
       - CELERY_RESULT_BACKEND=redis://redis:6380/0
       - CELERY_WORKER=1
-      - JUMP_DATA_SOURCE=esi
-      - JUMP_API_URL=http://localhost:8001
+      - JUMP_DATA_SOURCE=fastapi
+      - JUMP_API_URL=http://100.81.178.26:8001
     volumes:
       - ./src/instance:/app/src/instance
     depends_on:

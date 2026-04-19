@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import RouteControls from './components/RouteControls';
+import type { RouteParams } from './components/RouteControls';
 import RouteTable from './components/RouteTable';
 import type { RouteResult } from './types';
 import { formatTime } from './utils/format';
@@ -9,16 +10,10 @@ export default function App() {
   const [result, setResult] = useState<RouteResult | null>(null);
   const [error, setError] = useState('');
   const [progress, setProgress] = useState('');
-  const routeParamsRef = useRef<{
-    ship_class: string;
-    jdc_level: number;
-    jfc_level: number;
-    initial_fatigue: number;
-    mode: string;
-  } | null>(null);
+  const routeParamsRef = useRef<RouteParams | null>(null);
   const [showOptimized, setShowOptimized] = useState(false);
 
-  function handleResult(r: RouteResult, params?: { ship_class: string; jdc_level: number; jfc_level: number; initial_fatigue: number; mode: string }) {
+  function handleResult(r: RouteResult, params?: RouteParams) {
     setError('');
     setProgress('');
     setResult(r);
@@ -163,8 +158,30 @@ export default function App() {
             >
               Copy as Text
             </button>
+            <button
+              onClick={() => {
+                const shipClass = routeParamsRef.current?.ship_class ?? '';
+                const dotlanShipMap: Record<string, string> = {
+                  'Carrier/Dreadnought/FAX': 'Archon',
+                  'Supercarrier/Titan': 'Ragnarok',
+                  'Rorqual': 'Rorqual',
+                  'Black Ops': 'Sin',
+                  'Jump Freighter': 'Rhea',
+                };
+                const dotlanShip = dotlanShipMap[shipClass] ?? 'Archon';
+                const jdc = routeParamsRef.current?.jdc_level ?? 5;
+                const jfc = routeParamsRef.current?.jfc_level ?? 4;
+                const jfSkill = routeParamsRef.current?.jf_skill ?? 0;
+                const systems = activeSteps.map((s) => s.system_name).join(':');
+                const url = `https://evemaps.dotlan.net/jump/${dotlanShip},${jdc}${jfc}${jfSkill}/${systems}`;
+                window.open(url, '_blank');
+              }}
+              className="px-3 py-1 rounded text-sm bg-gray-700 text-gray-300 hover:bg-gray-600"
+            >
+              Open in Dotlan
+            </button>
           </div>
-          <RouteTable steps={activeSteps} zkill={result.zkill} alternatives={result.alternatives} onSwap={handleSwap} />
+          <RouteTable steps={activeSteps} zkill={result.zkill} alternatives={result.alternatives} jumpDataWindow={result.jump_data_window} onSwap={handleSwap} />
         </>
       )}
     </div>

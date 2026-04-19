@@ -20,6 +20,12 @@ export function planRouteSSE(
     initial_fatigue: number;
     mode: 'safe' | 'direct' | 'pos';
     avoid_alliances: string;
+    base_system_cost: number;
+    distance_exponent: number;
+    danger_weight: number;
+    jumps_weight: number;
+    dead_end_bonus: number;
+    pos_moon_bonus: number;
   },
   callbacks: {
     onProgress: (msg: string) => void;
@@ -36,6 +42,12 @@ export function planRouteSSE(
     initial_fatigue: String(params.initial_fatigue),
     mode: params.mode,
     avoid_alliances: params.avoid_alliances,
+    base_system_cost: String(params.base_system_cost),
+    distance_exponent: String(params.distance_exponent),
+    danger_weight: String(params.danger_weight),
+    jumps_weight: String(params.jumps_weight),
+    dead_end_bonus: String(params.dead_end_bonus),
+    pos_moon_bonus: String(params.pos_moon_bonus),
   });
 
   const es = new EventSource(`/api/route?${qs}`);
@@ -71,6 +83,12 @@ export async function swapHop(params: {
   jfc_level: number;
   initial_fatigue: number;
   mode: string;
+  base_system_cost: number;
+  distance_exponent: number;
+  danger_weight: number;
+  jumps_weight: number;
+  dead_end_bonus: number;
+  pos_moon_bonus: number;
 }): Promise<RouteResult> {
   const qs = new URLSearchParams({
     path: params.path.join(','),
@@ -81,6 +99,12 @@ export async function swapHop(params: {
     jfc_level: String(params.jfc_level),
     initial_fatigue: String(params.initial_fatigue),
     mode: params.mode,
+    base_system_cost: String(params.base_system_cost),
+    distance_exponent: String(params.distance_exponent),
+    danger_weight: String(params.danger_weight),
+    jumps_weight: String(params.jumps_weight),
+    dead_end_bonus: String(params.dead_end_bonus),
+    pos_moon_bonus: String(params.pos_moon_bonus),
   });
   const resp = await fetch(`/api/route/swap?${qs}`);
   return resp.json();

@@ -5,6 +5,14 @@ import os
 from flask import Blueprint, request, jsonify, Response
 
 from src.models.models import db, SolarSystemName, MapSolarSystem
+from src.constants import (
+    BASE_SYSTEM_COST,
+    DISTANCE_EXPONENT,
+    DANGER_WEIGHT,
+    JUMPS_WEIGHT,
+    DEAD_END_BONUS,
+    POS_MOON_BONUS,
+)
 from src.pathfinder import find_route, find_optimal_wait
 from src.tasks import get_danger_data
 
@@ -97,7 +105,9 @@ def init_route_data(app):
                         save_esi_kills(app.instance_path, kills)
                     source = os.environ.get("JUMP_DATA_SOURCE", "esi")
                     if source == "fastapi":
-                        api_url = os.environ.get("JUMP_API_URL", "http://localhost:8001")
+                        api_url = os.environ.get(
+                            "JUMP_API_URL", "http://localhost:8001"
+                        )
                         jumps = fetch_system_jumps_from_api(api_url)
                     else:
                         jumps = fetch_system_jumps()
@@ -248,6 +258,16 @@ class RouteBlueprint(Blueprint):
             if avoid_alliances_str
             else set()
         )
+        base_system_cost = request.args.get(
+            "base_system_cost", BASE_SYSTEM_COST, type=int
+        )
+        distance_exponent = request.args.get(
+            "distance_exponent", DISTANCE_EXPONENT, type=float
+        )
+        danger_weight = request.args.get("danger_weight", DANGER_WEIGHT, type=int)
+        jumps_weight = request.args.get("jumps_weight", JUMPS_WEIGHT, type=int)
+        dead_end_bonus = request.args.get("dead_end_bonus", DEAD_END_BONUS, type=int)
+        pos_moon_bonus = request.args.get("pos_moon_bonus", POS_MOON_BONUS, type=int)
 
         def generate():
             def send_event(event: str, data: dict | str) -> str:
@@ -293,6 +313,12 @@ class RouteBlueprint(Blueprint):
                 on_progress=on_progress_collect,
                 mode=mode,
                 avoid_alliances=avoid_alliances if avoid_alliances else None,
+                base_system_cost=base_system_cost,
+                distance_exponent=distance_exponent,
+                danger_weight=danger_weight,
+                jumps_weight=jumps_weight,
+                dead_end_bonus=dead_end_bonus,
+                pos_moon_bonus=pos_moon_bonus,
             )
 
             for msg in progress_messages:
@@ -390,6 +416,7 @@ class RouteBlueprint(Blueprint):
                 alts.sort(key=lambda a: a["distance_ly"])
                 alternatives[str(steps[idx].system_id)] = alts[:10]
 
+            jump_data_source = os.environ.get("JUMP_DATA_SOURCE", "esi")
             result_data: dict = {
                 "steps": [s.to_dict() for s in steps],
                 "total_jumps": len(steps) - 1,
@@ -403,6 +430,7 @@ class RouteBlueprint(Blueprint):
                     "start": quiet_start,
                     "end": quiet_end,
                 },
+                "jump_data_window": "24h" if jump_data_source == "fastapi" else "1h",
             }
             if optimized_steps:
                 result_data["optimized"] = {
@@ -436,6 +464,16 @@ class RouteBlueprint(Blueprint):
         jfc_level = request.args.get("jfc_level", 0, type=int)
         initial_fatigue = request.args.get("initial_fatigue", 0.0, type=float)
         mode = request.args.get("mode", "safe")
+        base_system_cost = request.args.get(
+            "base_system_cost", BASE_SYSTEM_COST, type=int
+        )
+        distance_exponent = request.args.get(
+            "distance_exponent", DISTANCE_EXPONENT, type=float
+        )
+        danger_weight = request.args.get("danger_weight", DANGER_WEIGHT, type=int)
+        jumps_weight = request.args.get("jumps_weight", JUMPS_WEIGHT, type=int)
+        dead_end_bonus = request.args.get("dead_end_bonus", DEAD_END_BONUS, type=int)
+        pos_moon_bonus = request.args.get("pos_moon_bonus", POS_MOON_BONUS, type=int)
 
         if (
             not path_str
@@ -476,6 +514,12 @@ class RouteBlueprint(Blueprint):
             danger_data=danger,
             mode=mode,
             exclude_systems={replaced_id},
+            base_system_cost=base_system_cost,
+            distance_exponent=distance_exponent,
+            danger_weight=danger_weight,
+            jumps_weight=jumps_weight,
+            dead_end_bonus=dead_end_bonus,
+            pos_moon_bonus=pos_moon_bonus,
         )
 
         if not suffix_steps:

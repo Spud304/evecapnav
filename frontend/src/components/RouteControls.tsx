@@ -3,12 +3,28 @@ import SystemSearch from './SystemSearch';
 import { getShipClasses, planRouteSSE } from '../api';
 import type { ShipClass, RouteResult } from '../types';
 
+const DEFAULT_WEIGHTS = {
+  base_system_cost: 200,
+  distance_exponent: 1.5,
+  danger_weight: 600,
+  jumps_weight: 60,
+  dead_end_bonus: 100,
+  pos_moon_bonus: 5,
+};
+
 export interface RouteParams {
   ship_class: string;
   jdc_level: number;
   jfc_level: number;
+  jf_skill: number;
   initial_fatigue: number;
   mode: string;
+  base_system_cost: number;
+  distance_exponent: number;
+  danger_weight: number;
+  jumps_weight: number;
+  dead_end_bonus: number;
+  pos_moon_bonus: number;
 }
 
 interface Props {
@@ -26,9 +42,18 @@ export default function RouteControls({ onResult, onError, onProgress }: Props) 
   const [jfc, setJfc] = useState(4);
   const [fatigue, setFatigue] = useState(0);
   const [mode, setMode] = useState<'safe' | 'direct' | 'pos'>('safe');
+  const [jfSkill, setJfSkill] = useState(4);
   const [avoidAlliances, setAvoidAlliances] = useState('');
   const [loading, setLoading] = useState(false);
   const esRef = useRef<EventSource | null>(null);
+
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [baseSystemCost, setBaseSystemCost] = useState(DEFAULT_WEIGHTS.base_system_cost);
+  const [distanceExponent, setDistanceExponent] = useState(DEFAULT_WEIGHTS.distance_exponent);
+  const [dangerWeight, setDangerWeight] = useState(DEFAULT_WEIGHTS.danger_weight);
+  const [jumpsWeight, setJumpsWeight] = useState(DEFAULT_WEIGHTS.jumps_weight);
+  const [deadEndBonus, setDeadEndBonus] = useState(DEFAULT_WEIGHTS.dead_end_bonus);
+  const [posMoonBonus, setPosMoonBonus] = useState(DEFAULT_WEIGHTS.pos_moon_bonus);
 
   useEffect(() => {
     getShipClasses().then((classes) => {
@@ -48,17 +73,25 @@ export default function RouteControls({ onResult, onError, onProgress }: Props) 
     setLoading(true);
     onProgress('Connecting...');
 
+    const params = {
+      origin_id: originId,
+      destination_id: destId,
+      ship_class: shipClass,
+      jdc_level: jdc,
+      jfc_level: jfc,
+      initial_fatigue: fatigue,
+      mode,
+      avoid_alliances: avoidAlliances,
+      base_system_cost: baseSystemCost,
+      distance_exponent: distanceExponent,
+      danger_weight: dangerWeight,
+      jumps_weight: jumpsWeight,
+      dead_end_bonus: deadEndBonus,
+      pos_moon_bonus: posMoonBonus,
+    };
+
     esRef.current = planRouteSSE(
-      {
-        origin_id: originId,
-        destination_id: destId,
-        ship_class: shipClass,
-        jdc_level: jdc,
-        jfc_level: jfc,
-        initial_fatigue: fatigue,
-        mode,
-        avoid_alliances: avoidAlliances,
-      },
+      params,
       {
         onProgress: (msg) => onProgress(msg),
         onResult: (result) => {
@@ -70,8 +103,15 @@ export default function RouteControls({ onResult, onError, onProgress }: Props) 
               ship_class: shipClass,
               jdc_level: jdc,
               jfc_level: jfc,
+              jf_skill: jfSkill,
               initial_fatigue: fatigue,
               mode,
+              base_system_cost: baseSystemCost,
+              distance_exponent: distanceExponent,
+              danger_weight: dangerWeight,
+              jumps_weight: jumpsWeight,
+              dead_end_bonus: deadEndBonus,
+              pos_moon_bonus: posMoonBonus,
             });
           }
         },
@@ -81,6 +121,15 @@ export default function RouteControls({ onResult, onError, onProgress }: Props) 
         },
       },
     );
+  }
+
+  function resetWeights() {
+    setBaseSystemCost(DEFAULT_WEIGHTS.base_system_cost);
+    setDistanceExponent(DEFAULT_WEIGHTS.distance_exponent);
+    setDangerWeight(DEFAULT_WEIGHTS.danger_weight);
+    setJumpsWeight(DEFAULT_WEIGHTS.jumps_weight);
+    setDeadEndBonus(DEFAULT_WEIGHTS.dead_end_bonus);
+    setPosMoonBonus(DEFAULT_WEIGHTS.pos_moon_bonus);
   }
 
   return (
@@ -95,7 +144,7 @@ export default function RouteControls({ onResult, onError, onProgress }: Props) 
           onSelect={(id) => setDestId(id)}
         />
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-3 items-end">
+      <div className={`grid grid-cols-2 gap-3 items-end ${shipClass === 'Jump Freighter' ? 'md:grid-cols-[2fr_1fr_1fr_1fr_2fr_1fr_auto]' : 'md:grid-cols-[2fr_1fr_1fr_2fr_1fr_auto]'}`}>
         <div>
           <label className="block text-sm mb-1 text-gray-300">Ship Class</label>
           <select
@@ -111,7 +160,7 @@ export default function RouteControls({ onResult, onError, onProgress }: Props) 
           </select>
         </div>
         <div>
-          <label className="block text-sm mb-1 text-gray-300">JDC Level</label>
+          <label className="block text-sm mb-1 text-gray-300">JDC</label>
           <select
             value={jdc}
             onChange={(e) => setJdc(Number(e.target.value))}
@@ -125,7 +174,7 @@ export default function RouteControls({ onResult, onError, onProgress }: Props) 
           </select>
         </div>
         <div>
-          <label className="block text-sm mb-1 text-gray-300">JFC Level</label>
+          <label className="block text-sm mb-1 text-gray-300">JFC</label>
           <select
             value={jfc}
             onChange={(e) => setJfc(Number(e.target.value))}
@@ -138,6 +187,22 @@ export default function RouteControls({ onResult, onError, onProgress }: Props) 
             ))}
           </select>
         </div>
+        {shipClass === 'Jump Freighter' && (
+          <div>
+            <label className="block text-sm mb-1 text-gray-300">JF</label>
+            <select
+              value={jfSkill}
+              onChange={(e) => setJfSkill(Number(e.target.value))}
+              className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-600 text-gray-200"
+            >
+              {[0, 1, 2, 3, 4, 5].map((level) => (
+                <option key={level} value={level}>
+                  {level}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div>
           <label className="block text-sm mb-1 text-gray-300">Routing Mode</label>
           <select
@@ -183,6 +248,120 @@ export default function RouteControls({ onResult, onError, onProgress }: Props) 
           className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-600 text-gray-200"
         />
       </div>
+
+      {mode !== 'direct' && (
+        <div className="mt-3">
+          <button
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="text-sm text-gray-400 hover:text-gray-200 flex items-center gap-1"
+          >
+            <span>{showAdvanced ? '▼' : '▶'}</span>
+            Advanced Weights
+          </button>
+
+          {showAdvanced && (
+            <div className="mt-2 p-3 bg-gray-900/50 rounded border border-gray-700">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-gray-500">
+                  Adjust how the routing algorithm scores each system
+                </span>
+                <button
+                  onClick={resetWeights}
+                  className="text-xs text-gray-500 hover:text-gray-300 underline"
+                >
+                  Reset defaults
+                </button>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs mb-1 text-gray-400">
+                    Base System Cost
+                    <span className="block text-gray-600">Baseline per system</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={baseSystemCost}
+                    onChange={(e) => setBaseSystemCost(Number(e.target.value))}
+                    min={0}
+                    className="w-full px-2 py-1.5 rounded bg-gray-800 border border-gray-600 text-gray-200 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs mb-1 text-gray-400">
+                    Distance Exponent
+                    <span className="block text-gray-600">1.0 = linear, 2.0 = heavy</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={distanceExponent}
+                    onChange={(e) => setDistanceExponent(Number(e.target.value))}
+                    min={1}
+                    max={3}
+                    step={0.1}
+                    className="w-full px-2 py-1.5 rounded bg-gray-800 border border-gray-600 text-gray-200 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs mb-1 text-gray-400">
+                    Danger Weight
+                    <span className="block text-gray-600">Cost per kill</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={dangerWeight}
+                    onChange={(e) => setDangerWeight(Number(e.target.value))}
+                    min={0}
+                    className="w-full px-2 py-1.5 rounded bg-gray-800 border border-gray-600 text-gray-200 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs mb-1 text-gray-400">
+                    Jumps Weight
+                    <span className="block text-gray-600">Cost per jump</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={jumpsWeight}
+                    onChange={(e) => setJumpsWeight(Number(e.target.value))}
+                    min={0}
+                    className="w-full px-2 py-1.5 rounded bg-gray-800 border border-gray-600 text-gray-200 text-sm"
+                  />
+                </div>
+                {mode === 'safe' && (
+                  <div>
+                    <label className="block text-xs mb-1 text-gray-400">
+                      Dead End Bonus
+                      <span className="block text-gray-600">Bonus for 1-gate systems</span>
+                    </label>
+                    <input
+                      type="number"
+                      value={deadEndBonus}
+                      onChange={(e) => setDeadEndBonus(Number(e.target.value))}
+                      min={0}
+                      className="w-full px-2 py-1.5 rounded bg-gray-800 border border-gray-600 text-gray-200 text-sm"
+                    />
+                  </div>
+                )}
+                {mode === 'pos' && (
+                  <div>
+                    <label className="block text-xs mb-1 text-gray-400">
+                      Moon Bonus
+                      <span className="block text-gray-600">Bonus per moon</span>
+                    </label>
+                    <input
+                      type="number"
+                      value={posMoonBonus}
+                      onChange={(e) => setPosMoonBonus(Number(e.target.value))}
+                      min={0}
+                      className="w-full px-2 py-1.5 rounded bg-gray-800 border border-gray-600 text-gray-200 text-sm"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

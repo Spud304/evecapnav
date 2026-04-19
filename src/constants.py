@@ -32,8 +32,13 @@ CAPITAL_GROUP_IDS = {
 }
 
 # Danger penalties added to A* cost per system
+BASE_SYSTEM_COST = 200  # baseline cost for every system (bonuses subtract from this)
+DISTANCE_EXPONENT = 1.5  # dist^exp in cost — 1.0=linear, 2.0=heavy fatigue penalty
 DANGER_WEIGHT = 600  # per kill/hr
 JUMPS_WEIGHT = 60  # per jump/hr (traffic = eyes on you)
 
 # POS hopping: bonus per moon (reduces cost for moon-rich systems)
 POS_MOON_BONUS = 5  # cost reduction per moon in system
+
+# Dead-end system bonus (safe mode): systems with only 1 gate are quieter
+DEAD_END_BONUS = 100  # cost reduction for single-gate systems

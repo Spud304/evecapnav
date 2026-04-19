@@ -6,9 +6,12 @@ from typing import Callable
 
 from src.constants import (
     MAX_FATIGUE_MINUTES,
+    BASE_SYSTEM_COST,
+    DISTANCE_EXPONENT,
     DANGER_WEIGHT,
     JUMPS_WEIGHT,
     POS_MOON_BONUS,
+    DEAD_END_BONUS,
 )
 from src.systems import SystemInfo, compute_distance_ly
 
@@ -30,6 +33,7 @@ class RouteStep:
     safe_spot_warp: str
     safe_spot_nearest: str
     moon_count: int
+    gate_count: int
     sov_owner: str
 
     def to_dict(self) -> dict:
@@ -85,14 +89,22 @@ def find_route(
     mode: str = "safe",
     avoid_alliances: set[str] | None = None,
     exclude_systems: set[int] | None = None,
+    base_system_cost: int = BASE_SYSTEM_COST,
+    distance_exponent: float = DISTANCE_EXPONENT,
+    danger_weight: int = DANGER_WEIGHT,
+    jumps_weight: int = JUMPS_WEIGHT,
+    dead_end_bonus: int = DEAD_END_BONUS,
+    pos_moon_bonus: int = POS_MOON_BONUS,
 ) -> list[RouteStep]:
     """A* search to find optimal jump route, then simulate fatigue.
 
     State is system_id only (no fatigue tracking in search).
+    Distance is raised to distance_exponent (default 1.5) so the algorithm
+    penalizes long jumps proportionally to their fatigue impact.
     Modes:
-      - "safe": cost = distance + danger penalty (avoids kills/traffic)
-      - "direct": cost = distance only (fastest path)
-      - "pos": cost = distance + danger - moon bonus (prefers moon-rich systems)
+      - "safe": cost = dist^exp + danger penalty (avoids kills/traffic)
+      - "direct": cost = dist^exp only (shortest path with fatigue awareness)
+      - "pos": cost = dist^exp + danger - moon bonus (prefers moon-rich systems)
     Fatigue is simulated on the found path afterward.
     """
     if origin_id not in systems or dest_id not in systems:
@@ -161,18 +173,22 @@ def find_route(
             else:
                 sys_danger = danger.get(neighbor_id, {})
                 danger_cost = (
-                    sys_danger.get("ship_kills", 0) * DANGER_WEIGHT
-                    + sys_danger.get("ship_jumps", 0) * JUMPS_WEIGHT
+                    base_system_cost
+                    + sys_danger.get("ship_kills", 0) * danger_weight
+                    + sys_danger.get("ship_jumps", 0) * jumps_weight
                 )
                 if mode == "pos":
-                    danger_cost -= neighbor.moon_count * POS_MOON_BONUS
-                extra_cost = danger_cost
+                    danger_cost -= neighbor.moon_count * pos_moon_bonus
+                if mode == "safe" and neighbor.gate_count == 1:
+                    danger_cost -= dead_end_bonus
+                # Clamp to zero — negative costs break A* admissibility
+                extra_cost = max(0, danger_cost)
 
             # Heavily penalize avoided alliance space
             if avoid and neighbor.sov_alliance_name in avoid:
                 extra_cost += 100000
 
-            new_cost = cost_so_far + dist_ly + extra_cost
+            new_cost = cost_so_far + dist_ly**distance_exponent + extra_cost
 
             if new_cost < best_cost.get(neighbor_id, float("inf")):
                 best_cost[neighbor_id] = new_cost
@@ -235,6 +251,7 @@ def _simulate_route(
                     safe_spot_warp=s.safe_spot_warp,
                     safe_spot_nearest=s.safe_spot_nearest,
                     moon_count=s.moon_count,
+                    gate_count=s.gate_count,
                     sov_owner=s.sov_alliance_name or s.sov_faction_name,
                 )
             )
@@ -262,6 +279,7 @@ def _simulate_route(
                 safe_spot_warp=s.safe_spot_warp,
                 safe_spot_nearest=s.safe_spot_nearest,
                 moon_count=s.moon_count,
+                gate_count=s.gate_count,
                 sov_owner=s.sov_alliance_name or s.sov_faction_name,
             )
         )

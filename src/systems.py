@@ -52,6 +52,7 @@ class SystemInfo:
     safe_spot_warp: str = ""
     safe_spot_nearest: str = ""
     moon_count: int = 0
+    gate_count: int = 0
     sov_alliance_name: str = ""
     sov_faction_name: str = ""
 
@@ -76,12 +77,17 @@ def load_systems() -> dict[int, SystemInfo]:
         .filter(MapSolarSystem.regionID < 14000000)  # exclude Jove space
         .all()
     )
-    # Count moons per system
+    # Count moons and gates per system
     from sqlalchemy import func
 
     moon_counts = dict(
         db.session.query(MapMoon.solarSystemID, func.count(MapMoon.moonID))
         .group_by(MapMoon.solarSystemID)
+        .all()
+    )
+    gate_counts = dict(
+        db.session.query(MapStargate.solarSystemID, func.count(MapStargate.stargateID))
+        .group_by(MapStargate.solarSystemID)
         .all()
     )
 
@@ -100,6 +106,7 @@ def load_systems() -> dict[int, SystemInfo]:
             x2d=float(r.x2D) if r.x2D else 0.0,
             y2d=float(r.y2D) if r.y2D else 0.0,
             moon_count=moon_counts.get(r.solarSystemID, 0),
+            gate_count=gate_counts.get(r.solarSystemID, 0),
         )
     return systems
 
