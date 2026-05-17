@@ -96,6 +96,11 @@ export default function RouteTable({
                     <td className="border-b border-[var(--color-line-soft)] py-[11px] px-3 align-middle">
                       <div className="font-semibold text-[var(--color-ink)]">
                         {step.system_name}
+                        {step.edge_type === 'gate' && (
+                          <span className="pill ml-1.5 bg-[var(--color-accent)] text-white">
+                            Gate
+                          </span>
+                        )}
                         {step.gate_count === 1 && (
                           <span className="pill ml-1.5">Dead End</span>
                         )}

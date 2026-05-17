@@ -26,6 +26,8 @@ export function planRouteSSE(
     jumps_weight: number;
     dead_end_bonus: number;
     pos_moon_bonus: number;
+    gate_mode?: 'off' | 'interregional' | 'all';
+    gate_equivalent_jumps?: number;
   },
   callbacks: {
     onProgress: (msg: string) => void;
@@ -48,6 +50,8 @@ export function planRouteSSE(
     jumps_weight: String(params.jumps_weight),
     dead_end_bonus: String(params.dead_end_bonus),
     pos_moon_bonus: String(params.pos_moon_bonus),
+    gate_mode: params.gate_mode ?? 'off',
+    gate_equivalent_jumps: String(params.gate_equivalent_jumps ?? 5),
   });
 
   const es = new EventSource(`/api/route?${qs}`);

@@ -47,6 +47,8 @@ export default function RouteControls({ onResult, onError, onProgress }: Props) 
   const [loading, setLoading] = useState(false);
   const esRef = useRef<EventSource | null>(null);
 
+  const [gateMode, setGateMode] = useState<'off' | 'interregional' | 'all'>('off');
+  const [gateEquivalentJumps, setGateEquivalentJumps] = useState(5);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [baseSystemCost, setBaseSystemCost] = useState(DEFAULT_WEIGHTS.base_system_cost);
   const [distanceExponent, setDistanceExponent] = useState(DEFAULT_WEIGHTS.distance_exponent);
@@ -82,6 +84,8 @@ export default function RouteControls({ onResult, onError, onProgress }: Props) 
       initial_fatigue: fatigue,
       mode,
       avoid_alliances: avoidAlliances,
+      gate_mode: gateMode,
+      gate_equivalent_jumps: gateEquivalentJumps,
       base_system_cost: baseSystemCost,
       distance_exponent: distanceExponent,
       danger_weight: dangerWeight,
@@ -97,7 +101,22 @@ export default function RouteControls({ onResult, onError, onProgress }: Props) 
         onResult: (result) => {
           setLoading(false);
           if (result.error && !result.steps?.length) {
-            onError(result.error);
+            const isNoRoute = /no route/i.test(result.error);
+            if (isNoRoute && gateMode === 'off') {
+              onError(
+                'No route found at this ship’s jump range. Try enabling stargate hops, or use a longer-range ship class.',
+              );
+            } else if (isNoRoute && gateMode === 'interregional') {
+              onError(
+                'No route found. Try "All null/low gates" mode, or check that the SDE has stargate data (backend log: "Gate graph: 0 directed edges" means the SDE is missing).',
+              );
+            } else if (isNoRoute) {
+              onError(
+                'No route found. Origin and destination may not be connected via stargates — verify both are in null/low sec.',
+              );
+            } else {
+              onError(result.error);
+            }
           } else {
             onResult(result, {
               ship_class: shipClass,
@@ -243,6 +262,36 @@ export default function RouteControls({ onResult, onError, onProgress }: Props) 
               className="input"
             />
           </div>
+          <div className="flex flex-col">
+            <label className="field-label">Stargate hops</label>
+            <select
+              value={gateMode}
+              onChange={(e) =>
+                setGateMode(e.target.value as 'off' | 'interregional' | 'all')
+              }
+              className="select"
+            >
+              <option value="off">Off (jumps only)</option>
+              <option value="interregional">Inter-regional gates as shortcuts</option>
+              <option value="all">All null/low gates</option>
+            </select>
+          </div>
+          {gateMode !== 'off' && (
+            <div className="flex flex-col">
+              <label className="field-label">Gate cost (= N jumps)</label>
+              <input
+                type="number"
+                value={gateEquivalentJumps}
+                onChange={(e) => setGateEquivalentJumps(Number(e.target.value))}
+                min={0}
+                step={0.5}
+                className="input"
+              />
+              <span className="text-[11px] text-[var(--color-muted)] mt-[3px]">
+                Take gate when it saves ≥ this many jumps.
+              </span>
+            </div>
+          )}
         </div>
 
         <div className="mt-4 pt-[14px] border-t border-[var(--color-line-soft)] flex items-center gap-3">
