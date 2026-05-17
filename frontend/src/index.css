@@ -1,7 +1,132 @@
 @import "tailwindcss";
 
-body {
-  background: #1a1a2e;
-  color: #e0e0e0;
-  margin: 0;
+@theme {
+  --color-ink: #2a2f36;
+  --color-muted: #6b7682;
+  --color-line: #d8dde4;
+  --color-line-soft: #ecedf0;
+  --color-paper: #ffffff;
+  --color-canvas: #f6f7f9;
+  --color-accent: #3a6ea5;
+  --color-accent-dark: #294e7a;
+  --color-good: #2d7a4a;
+  --color-warn: #b07a14;
+  --color-bad: #b1382f;
 }
+
+html, body {
+  margin: 0;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+a {
+  color: var(--color-accent);
+  text-decoration: none;
+}
+a:hover { text-decoration: underline; }
+
+.card {
+  background: var(--color-paper);
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  box-shadow: 0 1px 1px rgba(20, 25, 40, 0.04);
+}
+
+.card-head {
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--color-line-soft);
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.card-head h2 {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-muted);
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+}
+
+.card-head .help {
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.card-body { padding: 16px 18px; }
+
+.input,
+.select {
+  width: 100%;
+  border: 1px solid var(--color-line);
+  border-radius: 5px;
+  padding: 7px 9px;
+  font: inherit;
+  background: #fff;
+  color: var(--color-ink);
+}
+.input:focus,
+.select:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(58, 110, 165, 0.12);
+}
+
+.field-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-muted);
+  margin-bottom: 4px;
+  letter-spacing: 0.3px;
+  display: block;
+}
+
+.btn-primary {
+  background: linear-gradient(#5a8ec6, #3a6ea5);
+  border: 1px solid var(--color-accent-dark);
+  color: #fff;
+  border-radius: 5px;
+  padding: 8px 18px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+.btn-primary:hover:not(:disabled) {
+  background: linear-gradient(#6a9ed6, #4477b0);
+}
+.btn-primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: #fff;
+  border: 1px solid var(--color-line);
+  color: var(--color-ink);
+  border-radius: 5px;
+  padding: 7px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.btn-secondary:hover {
+  background: #f8f9fb;
+}
+
+.pill {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: #eaf3e6;
+  border: 1px solid #cde0c1;
+  color: #3f5d18;
+  font-size: 10.5px;
+  font-weight: 600;
+  vertical-align: middle;
+}
+</content>

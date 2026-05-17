@@ -132,68 +132,55 @@ export default function RouteControls({ onResult, onError, onProgress }: Props) 
     setPosMoonBonus(DEFAULT_WEIGHTS.pos_moon_bonus);
   }
 
+  const isJf = shipClass === 'Jump Freighter';
+
   return (
-    <div className="bg-[#16213e] border border-[#0f3460] rounded-lg p-4 mb-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-        <SystemSearch
-          label="Origin System"
-          onSelect={(id) => setOriginId(id)}
-        />
-        <SystemSearch
-          label="Destination System"
-          onSelect={(id) => setDestId(id)}
-        />
+    <section className="card mb-[18px]">
+      <div className="card-head">
+        <h2>Route parameters</h2>
+        <span className="help">Enter origin, destination, and your skills.</span>
       </div>
-      <div className={`grid grid-cols-2 gap-3 items-end ${shipClass === 'Jump Freighter' ? 'md:grid-cols-[2fr_1fr_1fr_1fr_2fr_1fr_auto]' : 'md:grid-cols-[2fr_1fr_1fr_2fr_1fr_auto]'}`}>
-        <div>
-          <label className="block text-sm mb-1 text-gray-300">Ship Class</label>
-          <select
-            value={shipClass}
-            onChange={(e) => setShipClass(e.target.value)}
-            className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-600 text-gray-200"
-          >
-            {shipClasses.map((c) => (
-              <option key={c.label} value={c.label}>
-                {c.label} ({c.base_range_ly} LY)
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm mb-1 text-gray-300">JDC</label>
-          <select
-            value={jdc}
-            onChange={(e) => setJdc(Number(e.target.value))}
-            className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-600 text-gray-200"
-          >
-            {[0, 1, 2, 3, 4, 5].map((level) => (
-              <option key={level} value={level}>
-                {level}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm mb-1 text-gray-300">JFC</label>
-          <select
-            value={jfc}
-            onChange={(e) => setJfc(Number(e.target.value))}
-            className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-600 text-gray-200"
-          >
-            {[0, 1, 2, 3, 4, 5].map((level) => (
-              <option key={level} value={level}>
-                {level}
-              </option>
-            ))}
-          </select>
-        </div>
-        {shipClass === 'Jump Freighter' && (
-          <div>
-            <label className="block text-sm mb-1 text-gray-300">JF</label>
+      <div className="card-body">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-x-[18px] gap-y-[14px]">
+          <div className="flex flex-col">
+            <SystemSearch label="Origin" onSelect={(id) => setOriginId(id)} />
+          </div>
+          <div className="flex flex-col">
+            <SystemSearch label="Destination" onSelect={(id) => setDestId(id)} />
+          </div>
+          <div className="flex flex-col">
+            <label className="field-label">Ship class</label>
             <select
-              value={jfSkill}
-              onChange={(e) => setJfSkill(Number(e.target.value))}
-              className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-600 text-gray-200"
+              value={shipClass}
+              onChange={(e) => setShipClass(e.target.value)}
+              className="select"
+            >
+              {shipClasses.map((c) => (
+                <option key={c.label} value={c.label}>
+                  {c.label} ({c.base_range_ly} LY)
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col">
+            <label className="field-label">Routing mode</label>
+            <select
+              value={mode}
+              onChange={(e) => setMode(e.target.value as 'safe' | 'direct' | 'pos')}
+              className="select"
+            >
+              <option value="safe">Safe (avoid danger)</option>
+              <option value="direct">Direct (shortest path)</option>
+              <option value="pos">POS Hopping (prefer moons)</option>
+            </select>
+          </div>
+
+          <div className="flex flex-col">
+            <label className="field-label">JDC level</label>
+            <select
+              value={jdc}
+              onChange={(e) => setJdc(Number(e.target.value))}
+              className="select"
             >
               {[0, 1, 2, 3, 4, 5].map((level) => (
                 <option key={level} value={level}>
@@ -202,166 +189,158 @@ export default function RouteControls({ onResult, onError, onProgress }: Props) 
               ))}
             </select>
           </div>
-        )}
-        <div>
-          <label className="block text-sm mb-1 text-gray-300">Routing Mode</label>
-          <select
-            value={mode}
-            onChange={(e) => setMode(e.target.value as 'safe' | 'direct' | 'pos')}
-            className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-600 text-gray-200"
-          >
-            <option value="safe">Safe (avoid danger)</option>
-            <option value="direct">Direct (shortest path)</option>
-            <option value="pos">POS Hopping (prefer moons)</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm mb-1 text-gray-300">
-            Fatigue (min)
-          </label>
-          <input
-            type="number"
-            value={fatigue}
-            onChange={(e) => setFatigue(Number(e.target.value))}
-            min={0}
-            max={720}
-            className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-600 text-gray-200"
-          />
-        </div>
-        <button
-          onClick={handlePlan}
-          disabled={loading}
-          className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium"
-        >
-          {loading ? 'Planning...' : 'Plan Route'}
-        </button>
-      </div>
-      <div className="mt-3">
-        <label className="block text-sm mb-1 text-gray-300">
-          Avoid Alliances <span className="text-gray-500">(comma-separated names)</span>
-        </label>
-        <input
-          type="text"
-          value={avoidAlliances}
-          onChange={(e) => setAvoidAlliances(e.target.value)}
-          placeholder="e.g. Goonswarm Federation, Pandemic Horde"
-          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-600 text-gray-200"
-        />
-      </div>
-
-      {mode !== 'direct' && (
-        <div className="mt-3">
-          <button
-            onClick={() => setShowAdvanced(!showAdvanced)}
-            className="text-sm text-gray-400 hover:text-gray-200 flex items-center gap-1"
-          >
-            <span>{showAdvanced ? '▼' : '▶'}</span>
-            Advanced Weights
-          </button>
-
-          {showAdvanced && (
-            <div className="mt-2 p-3 bg-gray-900/50 rounded border border-gray-700">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-gray-500">
-                  Adjust how the routing algorithm scores each system
-                </span>
-                <button
-                  onClick={resetWeights}
-                  className="text-xs text-gray-500 hover:text-gray-300 underline"
-                >
-                  Reset defaults
-                </button>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs mb-1 text-gray-400">
-                    Base System Cost
-                    <span className="block text-gray-600">Baseline per system</span>
-                  </label>
-                  <input
-                    type="number"
-                    value={baseSystemCost}
-                    onChange={(e) => setBaseSystemCost(Number(e.target.value))}
-                    min={0}
-                    className="w-full px-2 py-1.5 rounded bg-gray-800 border border-gray-600 text-gray-200 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs mb-1 text-gray-400">
-                    Distance Exponent
-                    <span className="block text-gray-600">1.0 = linear, 2.0 = heavy</span>
-                  </label>
-                  <input
-                    type="number"
-                    value={distanceExponent}
-                    onChange={(e) => setDistanceExponent(Number(e.target.value))}
-                    min={1}
-                    max={3}
-                    step={0.1}
-                    className="w-full px-2 py-1.5 rounded bg-gray-800 border border-gray-600 text-gray-200 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs mb-1 text-gray-400">
-                    Danger Weight
-                    <span className="block text-gray-600">Cost per kill</span>
-                  </label>
-                  <input
-                    type="number"
-                    value={dangerWeight}
-                    onChange={(e) => setDangerWeight(Number(e.target.value))}
-                    min={0}
-                    className="w-full px-2 py-1.5 rounded bg-gray-800 border border-gray-600 text-gray-200 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs mb-1 text-gray-400">
-                    Jumps Weight
-                    <span className="block text-gray-600">Cost per jump</span>
-                  </label>
-                  <input
-                    type="number"
-                    value={jumpsWeight}
-                    onChange={(e) => setJumpsWeight(Number(e.target.value))}
-                    min={0}
-                    className="w-full px-2 py-1.5 rounded bg-gray-800 border border-gray-600 text-gray-200 text-sm"
-                  />
-                </div>
-                {mode === 'safe' && (
-                  <div>
-                    <label className="block text-xs mb-1 text-gray-400">
-                      Dead End Bonus
-                      <span className="block text-gray-600">Bonus for 1-gate systems</span>
-                    </label>
-                    <input
-                      type="number"
-                      value={deadEndBonus}
-                      onChange={(e) => setDeadEndBonus(Number(e.target.value))}
-                      min={0}
-                      className="w-full px-2 py-1.5 rounded bg-gray-800 border border-gray-600 text-gray-200 text-sm"
-                    />
-                  </div>
-                )}
-                {mode === 'pos' && (
-                  <div>
-                    <label className="block text-xs mb-1 text-gray-400">
-                      Moon Bonus
-                      <span className="block text-gray-600">Bonus per moon</span>
-                    </label>
-                    <input
-                      type="number"
-                      value={posMoonBonus}
-                      onChange={(e) => setPosMoonBonus(Number(e.target.value))}
-                      min={0}
-                      className="w-full px-2 py-1.5 rounded bg-gray-800 border border-gray-600 text-gray-200 text-sm"
-                    />
-                  </div>
-                )}
-              </div>
+          <div className="flex flex-col">
+            <label className="field-label">JFC level</label>
+            <select
+              value={jfc}
+              onChange={(e) => setJfc(Number(e.target.value))}
+              className="select"
+            >
+              {[0, 1, 2, 3, 4, 5].map((level) => (
+                <option key={level} value={level}>
+                  {level}
+                </option>
+              ))}
+            </select>
+          </div>
+          {isJf && (
+            <div className="flex flex-col">
+              <label className="field-label">JF skill</label>
+              <select
+                value={jfSkill}
+                onChange={(e) => setJfSkill(Number(e.target.value))}
+                className="select"
+              >
+                {[0, 1, 2, 3, 4, 5].map((level) => (
+                  <option key={level} value={level}>
+                    {level}
+                  </option>
+                ))}
+              </select>
             </div>
           )}
+          <div className="flex flex-col">
+            <label className="field-label">Initial fatigue (min)</label>
+            <input
+              type="number"
+              value={fatigue}
+              onChange={(e) => setFatigue(Number(e.target.value))}
+              min={0}
+              max={720}
+              className="input"
+            />
+            <span className="text-[11px] text-[var(--color-muted)] mt-[3px]">
+              Leave 0 if rested.
+            </span>
+          </div>
+          <div className={`flex flex-col ${isJf ? 'md:col-span-3' : 'md:col-span-2'}`}>
+            <label className="field-label">Avoid alliances</label>
+            <input
+              type="text"
+              value={avoidAlliances}
+              onChange={(e) => setAvoidAlliances(e.target.value)}
+              placeholder="Goonswarm Federation, Pandemic Horde, ..."
+              className="input"
+            />
+          </div>
         </div>
-      )}
-    </div>
+
+        <div className="mt-4 pt-[14px] border-t border-[var(--color-line-soft)] flex items-center gap-3">
+          {mode !== 'direct' && (
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="text-[12px] text-[var(--color-accent)] hover:underline list-none cursor-pointer"
+            >
+              {showAdvanced ? '▾' : '▸'} Advanced cost weights
+            </button>
+          )}
+          <div className="flex-1" />
+          {mode !== 'direct' && showAdvanced && (
+            <button
+              type="button"
+              onClick={resetWeights}
+              className="text-[12px] text-[var(--color-muted)] hover:text-[var(--color-ink)] underline"
+            >
+              Reset defaults
+            </button>
+          )}
+          <button onClick={handlePlan} disabled={loading} className="btn-primary">
+            {loading ? 'Planning…' : 'Plan Route'}
+          </button>
+        </div>
+
+        {mode !== 'direct' && showAdvanced && (
+          <div className="mt-3 pt-3 border-t border-dashed border-[var(--color-line)] grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2.5 text-[12px]">
+            <label className="flex justify-between items-center gap-2">
+              <span>Base system cost</span>
+              <input
+                type="number"
+                value={baseSystemCost}
+                onChange={(e) => setBaseSystemCost(Number(e.target.value))}
+                min={0}
+                className="input w-[80px] py-1 px-2 text-[12px]"
+              />
+            </label>
+            <label className="flex justify-between items-center gap-2">
+              <span>Distance exponent</span>
+              <input
+                type="number"
+                value={distanceExponent}
+                onChange={(e) => setDistanceExponent(Number(e.target.value))}
+                min={1}
+                max={3}
+                step={0.1}
+                className="input w-[80px] py-1 px-2 text-[12px]"
+              />
+            </label>
+            <label className="flex justify-between items-center gap-2">
+              <span>Danger weight</span>
+              <input
+                type="number"
+                value={dangerWeight}
+                onChange={(e) => setDangerWeight(Number(e.target.value))}
+                min={0}
+                className="input w-[80px] py-1 px-2 text-[12px]"
+              />
+            </label>
+            <label className="flex justify-between items-center gap-2">
+              <span>Jumps weight</span>
+              <input
+                type="number"
+                value={jumpsWeight}
+                onChange={(e) => setJumpsWeight(Number(e.target.value))}
+                min={0}
+                className="input w-[80px] py-1 px-2 text-[12px]"
+              />
+            </label>
+            {mode === 'safe' && (
+              <label className="flex justify-between items-center gap-2">
+                <span>Dead-end bonus</span>
+                <input
+                  type="number"
+                  value={deadEndBonus}
+                  onChange={(e) => setDeadEndBonus(Number(e.target.value))}
+                  min={0}
+                  className="input w-[80px] py-1 px-2 text-[12px]"
+                />
+              </label>
+            )}
+            {mode === 'pos' && (
+              <label className="flex justify-between items-center gap-2">
+                <span>Moon bonus</span>
+                <input
+                  type="number"
+                  value={posMoonBonus}
+                  onChange={(e) => setPosMoonBonus(Number(e.target.value))}
+                  min={0}
+                  className="input w-[80px] py-1 px-2 text-[12px]"
+                />
+              </label>
+            )}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }

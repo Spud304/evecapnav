@@ -46,26 +46,29 @@ export default function SystemSearch({ label, onSelect }: Props) {
   }
 
   return (
-    <div ref={wrapRef} className="relative">
-      <label className="block text-sm mb-1 text-gray-300">{label}</label>
+    <div ref={wrapRef} className="relative flex flex-col">
+      <label className="field-label">{label}</label>
       <input
         type="text"
         value={query}
         onChange={(e) => handleInput(e.target.value)}
-        placeholder="Type system name..."
+        placeholder="Type system name…"
         autoComplete="off"
-        className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-600 text-gray-200 focus:outline-none focus:border-blue-500"
+        className="input"
       />
       {open && (
-        <div className="absolute z-50 w-full bg-[#16213e] border border-[#0f3460] border-t-0 max-h-48 overflow-y-auto">
+        <div className="absolute z-50 left-0 right-0 top-full mt-px bg-white border border-[var(--color-line)] rounded-b-md shadow-md max-h-48 overflow-y-auto">
           {results.map((s) => (
             <div
               key={s.id}
               onClick={() => handleSelect(s)}
-              className="px-3 py-1.5 cursor-pointer hover:bg-[#0f3460] text-gray-200"
+              className="px-3 py-1.5 cursor-pointer hover:bg-[#f6f7f9] text-[var(--color-ink)] text-[12px]"
             >
               {s.name}{' '}
-              <span style={{ color: secColor(s.security) }}>
+              <span
+                className="font-semibold"
+                style={{ color: secColor(s.security) }}
+              >
                 ({s.security.toFixed(1)})
               </span>
             </div>

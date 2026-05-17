@@ -7,7 +7,7 @@ export function formatTime(minutes: number): string {
 }
 
 export function secColor(sec: number): string {
-  if (sec >= 0.45) return '#2ecc71';
-  if (sec > 0) return '#f39c12';
-  return '#e74c3c';
+  if (sec >= 0.45) return '#2d7a4a';
+  if (sec > 0) return '#b07a14';
+  return '#b1382f';
 }
