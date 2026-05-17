@@ -3,7 +3,8 @@ ESI_BASE_URL = "https://esi.evetech.net/latest"
 METERS_PER_LY = 9_460_730_472_580_800
 METERS_PER_AU = 149_597_870_700
 SAFE_SPOT_THRESHOLD_AU = 14.3
-MAX_FATIGUE_MINUTES = 43200  # 30 days
+MAX_FATIGUE_MINUTES = 300  # blue timer caps at 5 hours (March 2018 changes)
+MAX_COOLDOWN_MINUTES = 30  # red timer (jump activation cooldown) caps at 30 minutes
 
 # Dogma attribute IDs
 ATTR_JUMP_DRIVE_RANGE = 867
@@ -36,6 +37,7 @@ BASE_SYSTEM_COST = 200  # baseline cost for every system (bonuses subtract from 
 DISTANCE_EXPONENT = 1.5  # dist^exp in cost — 1.0=linear, 2.0=heavy fatigue penalty
 DANGER_WEIGHT = 600  # per kill/hr
 JUMPS_WEIGHT = 60  # per jump/hr (traffic = eyes on you)
+ACTIVITY_WEIGHT = 30  # per recent pilot activity count (historical data)
 
 # POS hopping: bonus per moon (reduces cost for moon-rich systems)
 POS_MOON_BONUS = 5  # cost reduction per moon in system

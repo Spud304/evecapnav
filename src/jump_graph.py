@@ -109,21 +109,21 @@ def load_ship_classes() -> dict[str, ShipClass]:
 
 
 def _fallback_ship_classes() -> dict[str, ShipClass]:
-    """Hardcoded fallback if SDE query fails."""
+    """Hardcoded fallback if SDE query fails. Values mirror current SDE dogma attrs."""
     classes = [
         ShipClass(
             "Carrier/Dreadnought/FAX",
             [GROUP_CARRIER, GROUP_DREADNOUGHT, GROUP_FAX],
             3.5,
-            1000,
+            3000,
             1.0,
         ),
-        ShipClass("Rorqual", [GROUP_CAPITAL_INDUSTRIAL], 5.0, 1000, 1.0),
+        ShipClass("Rorqual", [GROUP_CAPITAL_INDUSTRIAL], 5.0, 4000, 0.1),
         ShipClass(
-            "Supercarrier/Titan", [GROUP_SUPERCARRIER, GROUP_TITAN], 3.0, 1000, 1.0
+            "Supercarrier/Titan", [GROUP_SUPERCARRIER, GROUP_TITAN], 3.0, 3000, 1.0
         ),
-        ShipClass("Black Ops", [GROUP_BLACK_OPS], 4.0, 500, 0.25),
-        ShipClass("Jump Freighter", [GROUP_JUMP_FREIGHTER], 5.0, 1000, 0.1),
+        ShipClass("Black Ops", [GROUP_BLACK_OPS], 4.0, 700, 0.25),
+        ShipClass("Jump Freighter", [GROUP_JUMP_FREIGHTER], 5.0, 9000, 0.1),
     ]
     return {c.label: c for c in classes}
 

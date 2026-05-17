@@ -6,10 +6,12 @@ from typing import Callable
 
 from src.constants import (
     MAX_FATIGUE_MINUTES,
+    MAX_COOLDOWN_MINUTES,
     BASE_SYSTEM_COST,
     DISTANCE_EXPONENT,
     DANGER_WEIGHT,
     JUMPS_WEIGHT,
+    ACTIVITY_WEIGHT,
     POS_MOON_BONUS,
     DEAD_END_BONUS,
 )
@@ -51,13 +53,15 @@ def compute_fatigue(
     All values in minutes.
     Returns (fatigue_after_waiting, total_wait_minutes).
 
-    EVE formulas:
-      cooldown = max(fatigue/10, 1 + ly * fatigue_multiplier)
-      new_fatigue = min(43200, max(fatigue, 10) * (1 + ly * fatigue_multiplier))
+    EVE formulas (post-March-2018):
+      cooldown = min(30, max(fatigue/10, 1 + ly * fatigue_multiplier))   # red timer caps at 30 min
+      new_fatigue = min(300, max(fatigue, 10) * (1 + ly * fatigue_multiplier))  # blue timer caps at 5 h
       fatigue decays 1:1 with real time during the wait period
     """
     factor = distance_ly * fatigue_multiplier
-    cooldown = max(current_fatigue_min / 10.0, 1.0 + factor)
+    cooldown = min(
+        MAX_COOLDOWN_MINUTES, max(current_fatigue_min / 10.0, 1.0 + factor)
+    )
     raw_fatigue = min(
         MAX_FATIGUE_MINUTES, max(current_fatigue_min, 10.0) * (1.0 + factor)
     )
@@ -93,6 +97,7 @@ def find_route(
     distance_exponent: float = DISTANCE_EXPONENT,
     danger_weight: int = DANGER_WEIGHT,
     jumps_weight: int = JUMPS_WEIGHT,
+    activity_weight: int = ACTIVITY_WEIGHT,
     dead_end_bonus: int = DEAD_END_BONUS,
     pos_moon_bonus: int = POS_MOON_BONUS,
 ) -> list[RouteStep]:
@@ -176,6 +181,7 @@ def find_route(
                     base_system_cost
                     + sys_danger.get("ship_kills", 0) * danger_weight
                     + sys_danger.get("ship_jumps", 0) * jumps_weight
+                    + sys_danger.get("pilot_activity", 0) * activity_weight
                 )
                 if mode == "pos":
                     danger_cost -= neighbor.moon_count * pos_moon_bonus

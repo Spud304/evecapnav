@@ -10,7 +10,7 @@ class TestFatigue:
         """Zero initial fatigue produces baseline fatigue.
 
         EVE formula (all minutes):
-          raw_fatigue = min(43200, max(0, 10) * (1 + 5*1.0)) = 10 * 6 = 60 min
+          raw_fatigue = min(300, max(0, 10) * (1 + 5*1.0)) = 10 * 6 = 60 min
           cooldown = max(0/10, 1 + 5*1.0) = 6 min
           fatigue_after_wait = 60 - 6 = 54 min
         """
@@ -25,8 +25,8 @@ class TestFatigue:
         assert f2 > f1
 
     def test_fatigue_cap(self):
-        """Fatigue is capped at MAX_FATIGUE_MINUTES (30 days), minus cooldown decay."""
-        fatigue_after, cooldown = compute_fatigue(40000.0, 10.0, 1.0)
+        """Fatigue is capped at MAX_FATIGUE_MINUTES (5 hours), minus cooldown decay."""
+        fatigue_after, cooldown = compute_fatigue(200.0, 10.0, 1.0)
         assert fatigue_after == MAX_FATIGUE_MINUTES - cooldown
 
     def test_jf_bonus(self):

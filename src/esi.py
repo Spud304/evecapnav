@@ -74,6 +74,55 @@ def fetch_system_jumps_from_api(api_url: str) -> dict[int, int]:
         return {}
 
 
+def fetch_recent_activity(api_url: str) -> dict[int, int]:
+    """Fetch recent pilot activity from the historical data API.
+
+    Prefers the most recent snapshot (~last 30 min). If no recent snapshot
+    exists, falls back to the 24h average per system.
+    Returns {system_id: activity_count}.
+    """
+    try:
+        resp = requests.get(
+            f"{api_url}/api/jumps/history", params={"window": "24h"}, timeout=30
+        )
+        if resp.status_code != 200:
+            logger.warning(
+                "Failed to fetch activity history from API: status=%s", resp.status_code
+            )
+            return {}
+        data = resp.json()
+        snapshots = data.get("snapshots", [])
+        if not snapshots:
+            return {}
+
+        # Use most recent snapshot as "last 30 min" proxy
+        recent = snapshots[-1].get("systems", {})
+        if recent:
+            result = {int(sid): count for sid, count in recent.items()}
+            logger.info(
+                "Loaded recent activity: %d systems from latest snapshot", len(result)
+            )
+            return result
+
+        # Fallback: average across all 24h snapshots
+        totals: dict[int, int] = {}
+        for snapshot in snapshots:
+            for sys_id_str, count in snapshot.get("systems", {}).items():
+                sid = int(sys_id_str)
+                totals[sid] = totals.get(sid, 0) + count
+        n = len(snapshots)
+        result = {sid: total // n for sid, total in totals.items()}
+        logger.info(
+            "Loaded 24h average activity: %d systems from %d snapshots",
+            len(result),
+            n,
+        )
+        return result
+    except requests.RequestException as e:
+        logger.warning("Activity history request failed: %s", e)
+        return {}
+
+
 def fetch_sovereignty() -> dict[int, dict]:
     """Fetch sovereignty map. Returns {system_id: {alliance_id, faction_id}}."""
     status, data = esi_get(f"{ESI_BASE_URL}/sovereignty/map/")

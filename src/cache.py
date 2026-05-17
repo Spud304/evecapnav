@@ -64,6 +64,12 @@ def _init_cache_db(path: str) -> None:
         )
     """)
     conn.execute("""
+        CREATE TABLE IF NOT EXISTS esi_activity (
+            system_id INTEGER PRIMARY KEY,
+            pilot_activity INTEGER DEFAULT 0
+        )
+    """)
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS zkill_stats (
             system_id INTEGER PRIMARY KEY,
             hourly_activity TEXT DEFAULT '[]',
@@ -198,6 +204,18 @@ def save_esi_jumps(instance_path: str, jumps: dict[int, int]) -> None:
         "system_id, ship_jumps",
         "?, ?",
         list(jumps.items()),
+    )
+    _invalidate_danger_cache()
+
+
+def save_esi_activity(instance_path: str, activity: dict[int, int]) -> None:
+    """Save recent pilot activity data."""
+    _save_esi_table(
+        instance_path,
+        "esi_activity",
+        "system_id, pilot_activity",
+        "?, ?",
+        list(activity.items()),
     )
     _invalidate_danger_cache()
 
@@ -346,6 +364,7 @@ def load_danger_data(instance_path: str) -> dict[int, dict]:
             "npc_kills": row[2],
             "pod_kills": row[3],
             "ship_jumps": 0,
+            "pilot_activity": 0,
         }
     for row in conn.execute("SELECT system_id, ship_jumps FROM esi_jumps"):
         if row[0] in result:
@@ -356,7 +375,23 @@ def load_danger_data(instance_path: str) -> dict[int, dict]:
                 "npc_kills": 0,
                 "pod_kills": 0,
                 "ship_jumps": row[1],
+                "pilot_activity": 0,
             }
+    # Load historical pilot activity if available
+    try:
+        for row in conn.execute("SELECT system_id, pilot_activity FROM esi_activity"):
+            if row[0] in result:
+                result[row[0]]["pilot_activity"] = row[1]
+            else:
+                result[row[0]] = {
+                    "ship_kills": 0,
+                    "npc_kills": 0,
+                    "pod_kills": 0,
+                    "ship_jumps": 0,
+                    "pilot_activity": row[1],
+                }
+    except sqlite3.OperationalError:
+        pass  # Table may not exist yet on first run
     conn.close()
 
     _danger_cache = result

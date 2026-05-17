@@ -10,6 +10,7 @@ from src.constants import (
     DISTANCE_EXPONENT,
     DANGER_WEIGHT,
     JUMPS_WEIGHT,
+    ACTIVITY_WEIGHT,
     DEAD_END_BONUS,
     POS_MOON_BONUS,
 )
@@ -80,6 +81,7 @@ def init_route_data(app):
             is_esi_cache_stale,
             save_esi_kills,
             save_esi_jumps,
+            save_esi_activity,
             save_sovereignty,
             load_sovereignty,
             mark_esi_updated,
@@ -88,6 +90,7 @@ def init_route_data(app):
             fetch_system_kills,
             fetch_system_jumps,
             fetch_system_jumps_from_api,
+            fetch_recent_activity,
             fetch_sovereignty,
             fetch_names_batch,
         )
@@ -113,6 +116,14 @@ def init_route_data(app):
                         jumps = fetch_system_jumps()
                     if jumps:
                         save_esi_jumps(app.instance_path, jumps)
+                    # Fetch recent pilot activity from historical data API
+                    if source == "fastapi":
+                        api_url = os.environ.get(
+                            "JUMP_API_URL", "http://localhost:8001"
+                        )
+                        activity = fetch_recent_activity(api_url)
+                        if activity:
+                            save_esi_activity(app.instance_path, activity)
                     # Fetch sovereignty
                     sov = fetch_sovereignty()
                     if sov:
@@ -266,6 +277,7 @@ class RouteBlueprint(Blueprint):
         )
         danger_weight = request.args.get("danger_weight", DANGER_WEIGHT, type=int)
         jumps_weight = request.args.get("jumps_weight", JUMPS_WEIGHT, type=int)
+        activity_weight = request.args.get("activity_weight", ACTIVITY_WEIGHT, type=int)
         dead_end_bonus = request.args.get("dead_end_bonus", DEAD_END_BONUS, type=int)
         pos_moon_bonus = request.args.get("pos_moon_bonus", POS_MOON_BONUS, type=int)
 
@@ -317,6 +329,7 @@ class RouteBlueprint(Blueprint):
                 distance_exponent=distance_exponent,
                 danger_weight=danger_weight,
                 jumps_weight=jumps_weight,
+                activity_weight=activity_weight,
                 dead_end_bonus=dead_end_bonus,
                 pos_moon_bonus=pos_moon_bonus,
             )
@@ -472,6 +485,7 @@ class RouteBlueprint(Blueprint):
         )
         danger_weight = request.args.get("danger_weight", DANGER_WEIGHT, type=int)
         jumps_weight = request.args.get("jumps_weight", JUMPS_WEIGHT, type=int)
+        activity_weight = request.args.get("activity_weight", ACTIVITY_WEIGHT, type=int)
         dead_end_bonus = request.args.get("dead_end_bonus", DEAD_END_BONUS, type=int)
         pos_moon_bonus = request.args.get("pos_moon_bonus", POS_MOON_BONUS, type=int)
 
@@ -518,6 +532,7 @@ class RouteBlueprint(Blueprint):
             distance_exponent=distance_exponent,
             danger_weight=danger_weight,
             jumps_weight=jumps_weight,
+            activity_weight=activity_weight,
             dead_end_bonus=dead_end_bonus,
             pos_moon_bonus=pos_moon_bonus,
         )
