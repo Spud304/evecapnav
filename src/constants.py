@@ -44,3 +44,12 @@ POS_MOON_BONUS = 5  # cost reduction per moon in system
 
 # Dead-end system bonus (safe mode): systems with only 1 gate are quieter
 DEAD_END_BONUS = 100  # cost reduction for single-gate systems
+
+# Stargate hop cost in jump-equivalents (GARPA-style: gate ~= N jumps)
+GATE_EQUIVALENT_JUMPS = 5.0
+# Per-LY reference distance used to convert "gate equivalent jumps" into an
+# A* cost comparable to dist^exp jump costs. 5 LY is the rough middle of cap
+# jump ranges.
+GATE_JUMP_REFERENCE_LY = 5.0
+# Wall-clock seconds added for a stargate hop (align, decloak, jump cycle).
+GATE_TRAVEL_SECONDS = 45.0

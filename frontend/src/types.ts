@@ -14,6 +14,7 @@ export interface RouteStep {
   moon_count: number;
   gate_count: number;
   sov_owner: string;
+  edge_type?: string;
 }
 
 export interface OptimizedRoute {
@@ -44,6 +45,7 @@ export interface AlternativeSystem {
 export interface RouteResult {
   steps: RouteStep[];
   total_jumps: number;
+  total_gate_hops?: number;
   total_fuel: number;
   total_wait_minutes: number;
   optimized?: OptimizedRoute;

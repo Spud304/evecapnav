@@ -13,6 +13,7 @@ from src.constants import (
     ACTIVITY_WEIGHT,
     DEAD_END_BONUS,
     POS_MOON_BONUS,
+    GATE_EQUIVALENT_JUMPS,
 )
 from src.pathfinder import find_route, find_optimal_wait
 from src.tasks import get_danger_data
@@ -24,6 +25,7 @@ logger = logging.getLogger(__name__)
 # These get populated at startup by init_route_data()
 _systems = {}
 _graph = {}
+_gate_graph: dict = {}
 _ship_classes = {}
 
 
@@ -36,7 +38,12 @@ def init_route_data(app):
         load_celestials,
         precompute_safety_scores,
     )
-    from src.jump_graph import load_ship_classes, build_jump_graph, get_effective_range
+    from src.jump_graph import (
+        load_ship_classes,
+        build_jump_graph,
+        build_gate_graph,
+        get_effective_range,
+    )
 
     with app.app_context():
         logger.info("Loading systems from SDE...")
@@ -54,6 +61,32 @@ def init_route_data(app):
 
         logger.info("Building jump graph (max range %.1f LY)...", max_range)
         _graph.update(build_jump_graph(_systems, max_range))
+
+        logger.info("Building stargate graph...")
+        _gate_graph.update(build_gate_graph(_systems))
+        total_gate_edges = sum(len(v) for v in _gate_graph.values())
+        systems_with_gates = sum(1 for v in _gate_graph.values() if v)
+        # Use print() in addition to logger so this is visible even with
+        # default Flask logging config.
+        print(
+            f"[evecapnav] Gate graph ready: {systems_with_gates} systems with edges, "
+            f"{total_gate_edges} directed edges",
+            flush=True,
+        )
+        logger.info(
+            "Gate graph: %d systems with edges, %d total directed edges",
+            systems_with_gates,
+            total_gate_edges,
+        )
+        if total_gate_edges == 0:
+            print(
+                "[evecapnav] WARNING: Gate graph is EMPTY — gate routing will not work.",
+                flush=True,
+            )
+            logger.error(
+                "Gate graph is EMPTY — gate routing will not work. "
+                "Check that the SDE has 'mapStargate' and 'StargateDestination' tables."
+            )
 
         logger.info("Loading safety scores...")
         from src.cache import load_cached_safe_spots, save_cached_safe_spots
@@ -280,6 +313,12 @@ class RouteBlueprint(Blueprint):
         activity_weight = request.args.get("activity_weight", ACTIVITY_WEIGHT, type=int)
         dead_end_bonus = request.args.get("dead_end_bonus", DEAD_END_BONUS, type=int)
         pos_moon_bonus = request.args.get("pos_moon_bonus", POS_MOON_BONUS, type=int)
+        gate_mode = request.args.get("gate_mode", "off")
+        if gate_mode not in ("off", "interregional", "all"):
+            gate_mode = "off"
+        gate_equivalent_jumps = request.args.get(
+            "gate_equivalent_jumps", GATE_EQUIVALENT_JUMPS, type=float
+        )
 
         def generate():
             def send_event(event: str, data: dict | str) -> str:
@@ -302,6 +341,16 @@ class RouteBlueprint(Blueprint):
             jdc = max(0, min(5, jdc_level))
             sc = _ship_classes[ship_class_label]
             danger = get_danger_data()
+
+            # Echo the gate config to stdout so we can confirm requests are
+            # reaching the latest code at runtime.
+            if gate_mode != "off":
+                print(
+                    f"[evecapnav] /api/route gate_mode={gate_mode} "
+                    f"gate_equiv_jumps={gate_equivalent_jumps} "
+                    f"gate_graph_edges={sum(len(v) for v in _gate_graph.values())}",
+                    flush=True,
+                )
 
             progress_messages: list[str] = []
 
@@ -332,6 +381,9 @@ class RouteBlueprint(Blueprint):
                 activity_weight=activity_weight,
                 dead_end_bonus=dead_end_bonus,
                 pos_moon_bonus=pos_moon_bonus,
+                gate_graph=_gate_graph if _gate_graph else None,
+                gate_mode=gate_mode,
+                gate_equivalent_jumps=gate_equivalent_jumps,
             )
 
             for msg in progress_messages:
@@ -351,7 +403,9 @@ class RouteBlueprint(Blueprint):
             optimized_wait = 0.0
             if mode != "direct":
                 yield send_event("progress", "Optimizing wait times...")
-                path = [s.system_id for s in steps]
+                path = [
+                    (s.system_id, s.edge_type if s.edge_type else "jump") for s in steps
+                ]
                 optimized_steps, optimal_extra_wait = find_optimal_wait(
                     path,
                     _systems,
@@ -430,9 +484,12 @@ class RouteBlueprint(Blueprint):
                 alternatives[str(steps[idx].system_id)] = alts[:10]
 
             jump_data_source = os.environ.get("JUMP_DATA_SOURCE", "esi")
+            jump_hops = sum(1 for s in steps if s.edge_type == "jump")
+            gate_hops = sum(1 for s in steps if s.edge_type == "gate")
             result_data: dict = {
                 "steps": [s.to_dict() for s in steps],
-                "total_jumps": len(steps) - 1,
+                "total_jumps": jump_hops,
+                "total_gate_hops": gate_hops,
                 "total_fuel": total_fuel,
                 "total_wait_minutes": round(total_wait, 1),
                 "alternatives": alternatives,

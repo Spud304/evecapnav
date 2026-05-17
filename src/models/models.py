@@ -85,6 +85,13 @@ class MapStargate(db.Model):
     z: Mapped[Optional[str]] = mapped_column(Text)
 
 
+class StargateDestination(db.Model):
+    __tablename__ = "StargateDestination"
+
+    stargateID: Mapped[int] = mapped_column(Integer, primary_key=True)
+    solarSystemID: Mapped[Optional[int]] = mapped_column(Integer)
+
+
 class EveTypeName(db.Model):
     __tablename__ = "EveTypeName"
 

@@ -46,6 +46,7 @@ class SystemInfo:
     y: float
     z: float
     region_id: int
+    constellation_id: int = 0
     x2d: float = 0.0
     y2d: float = 0.0
     safe_spot_au: float = 0.0
@@ -103,6 +104,7 @@ def load_systems() -> dict[int, SystemInfo]:
             y=float(r.y),
             z=float(r.z),
             region_id=r.regionID or 0,
+            constellation_id=r.constellationID or 0,
             x2d=float(r.x2D) if r.x2D else 0.0,
             y2d=float(r.y2D) if r.y2D else 0.0,
             moon_count=moon_counts.get(r.solarSystemID, 0),
