@@ -337,7 +337,17 @@ def is_esi_cache_stale(instance_path: str, max_age_seconds: int = 3600) -> bool:
 
 
 def _invalidate_danger_cache() -> None:
-    global _danger_cache_time
+    """Force the next load_danger_data() call to re-read from disk.
+
+    Clears both the cached dict and the timestamp — clearing only the
+    timestamp is unsafe because `time.monotonic()` starts near zero on a
+    freshly booted host (e.g. a GitHub Actions runner), so a quick test
+    session never accumulates enough elapsed time to push past the TTL and
+    the stale dict gets returned. Clearing the dict makes the truthiness
+    check at the top of load_danger_data() short-circuit immediately.
+    """
+    global _danger_cache, _danger_cache_time
+    _danger_cache = {}
     _danger_cache_time = 0.0
 
 
