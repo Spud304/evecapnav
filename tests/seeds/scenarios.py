@@ -6,7 +6,7 @@ writes into a fresh `cache.sqlite`. Keep these tied to system IDs from
 pick.
 """
 
-from tests.seeds.topology import DANGER_ID, SAFE_ID, DEST_ID, ORIGIN_ID
+from tests.seeds.topology import DANGER_ID, SAFE_A_ID, SAFE_B_ID, DEST_ID, ORIGIN_ID
 
 # No threat data at all — pathfinder picks the geometrically shorter branch
 # (via DANGER_ID).
@@ -79,6 +79,7 @@ __all__ = [
     "ZKILL_INTEL",
     "ORIGIN_ID",
     "DANGER_ID",
-    "SAFE_ID",
+    "SAFE_A_ID",
+    "SAFE_B_ID",
     "DEST_ID",
 ]

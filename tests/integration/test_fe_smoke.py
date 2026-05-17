@@ -26,7 +26,8 @@ def test_system_search_autocomplete(page: Page, base_url: str) -> None:
     page.wait_for_timeout(500)
     expect(page.get_by_text("ItgOrigin")).to_be_visible()
     expect(page.get_by_text("ItgDanger")).to_be_visible()
-    expect(page.get_by_text("ItgSafe")).to_be_visible()
+    expect(page.get_by_text("ItgSafeA")).to_be_visible()
+    expect(page.get_by_text("ItgSafeB")).to_be_visible()
     expect(page.get_by_text("ItgDest")).to_be_visible()
 
 

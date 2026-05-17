@@ -1,8 +1,12 @@
 """End-to-end verification that threat-weighting knobs change the chosen route.
 
 Each test reseeds `cache.sqlite` with a single threat dimension (kills, jumps,
-historical activity), runs the FE pipeline twice, and asserts the mid-hop
-flipped between ItgDanger (raw shortest) and ItgSafe (rerouted to avoid threat).
+historical activity), runs the FE pipeline, and asserts whether the route
+includes ItgDanger (raw shortest) or detours through ItgSafeA/ItgSafeB to
+avoid the threat. The safe branch is 3 hops on purpose — see
+`tests/seeds/topology.py` — so the cost margin between branches stays well
+above any heap tie-break / float rounding noise that can differ between
+local macOS and CI Linux.
 
 `activity_weight` is not exposed in the form, so we only verify the default
 weight has an effect there — that still proves the activity column of
@@ -30,12 +34,23 @@ def _plan(page: Page, base_url: str) -> list[str]:
     return route_system_names(page)
 
 
+def _assert_danger_path(names: list[str]) -> None:
+    assert "ItgDanger" in names and "ItgSafeA" not in names, (
+        f"Expected raw shortest path through ItgDanger; got {names}"
+    )
+
+
+def _assert_safe_path(names: list[str]) -> None:
+    assert "ItgSafeA" in names and "ItgSafeB" in names and "ItgDanger" not in names, (
+        f"Expected detour via ItgSafeA → ItgSafeB; got {names}"
+    )
+
+
 def test_kills_reroute_via_safe_at_default_weight(
     page: Page, base_url: str, reseed
 ) -> None:
     reseed("kills_on_danger")
-    names = _plan(page, base_url)
-    assert names[1] == "ItgSafe", f"Expected reroute around danger; got {names}"
+    _assert_safe_path(_plan(page, base_url))
 
 
 def test_kills_pass_through_danger_when_weight_zeroed(
@@ -48,16 +63,14 @@ def test_kills_pass_through_danger_when_weight_zeroed(
     open_advanced_weights(page)
     set_weight(page, "Danger weight", 0)
     plan_route(page)
-    names = route_system_names(page)
-    assert names[1] == "ItgDanger", f"Expected raw shortest with dw=0; got {names}"
+    _assert_danger_path(route_system_names(page))
 
 
 def test_jumps_reroute_via_safe_at_default_weight(
     page: Page, base_url: str, reseed
 ) -> None:
     reseed("jumps_on_danger")
-    names = _plan(page, base_url)
-    assert names[1] == "ItgSafe", f"Traffic should reroute via Safe; got {names}"
+    _assert_safe_path(_plan(page, base_url))
 
 
 def test_jumps_pass_through_danger_when_weight_zeroed(
@@ -70,8 +83,7 @@ def test_jumps_pass_through_danger_when_weight_zeroed(
     open_advanced_weights(page)
     set_weight(page, "Jumps weight", 0)
     plan_route(page)
-    names = route_system_names(page)
-    assert names[1] == "ItgDanger", f"Expected raw shortest with jw=0; got {names}"
+    _assert_danger_path(route_system_names(page))
 
 
 def test_activity_data_affects_route_at_default_weight(
@@ -80,7 +92,4 @@ def test_activity_data_affects_route_at_default_weight(
     # Activity weight is not exposed in the form; this confirms the default
     # ACTIVITY_WEIGHT is applied to the activity column when present.
     reseed("activity_on_danger")
-    names = _plan(page, base_url)
-    assert names[1] == "ItgSafe", (
-        f"Activity should reroute via Safe with default activity_weight; got {names}"
-    )
+    _assert_safe_path(_plan(page, base_url))
