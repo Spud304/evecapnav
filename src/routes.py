@@ -18,7 +18,13 @@ from src.constants import (
 from src.pathfinder import find_route, find_optimal_wait
 from src.tasks import get_danger_data
 
-_instance_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "instance")
+
+def _resolve_instance_path() -> str:
+    override = os.environ.get("EVECAPNAV_INSTANCE_PATH")
+    if override:
+        return override
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "instance")
+
 
 logger = logging.getLogger(__name__)
 
@@ -432,7 +438,7 @@ class RouteBlueprint(Blueprint):
             aggregate_hourly = [0] * 24
             for step in steps:
                 sid = step.system_id
-                cached = load_zkill_stats(_instance_path, sid)
+                cached = load_zkill_stats(_resolve_instance_path(), sid)
                 if cached:
                     zkill_data[sid] = cached
                 else:
@@ -444,7 +450,7 @@ class RouteBlueprint(Blueprint):
                             "hourly_activity": hourly,
                             **threat,
                         }
-                        save_zkill_stats(_instance_path, sid, hourly, threat)
+                        save_zkill_stats(_resolve_instance_path(), sid, hourly, threat)
 
                 if sid in zkill_data:
                     for h in range(24):

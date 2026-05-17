@@ -20,6 +20,7 @@ test = [
     "pytest>=8.0",
     "responses>=0.25",
     "playwright>=1.40",
+    "pytest-playwright>=0.5",
 ]
 
 [tool.ruff]

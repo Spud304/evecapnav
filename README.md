@@ -51,6 +51,59 @@ uv run ruff format --check src/                    # Format check
 uv run --group test pytest tests/unit/ -x -q       # Unit tests
 ```
 
+## Tests
+
+Two suites — both run from a fresh `uv sync --group test`:
+
+### Unit tests
+
+Fast, no browser, ESI mocked. Use an in-memory SQLite seeded with a handful of systems.
+
+```bash
+uv run --group test pytest tests/unit/ -x -q
+```
+
+### Playwright FE regression suite
+
+The integration suite spawns its own Flask server on a free port (no `docker compose up` needed) backed by an in-memory SDE that's seeded with a 4-system fork topology. Each test reseeds `cache.sqlite` from a named scenario in `tests/seeds/scenarios.py` to verify the threat-weighting knobs (`danger_weight`, `jumps_weight`, `activity_weight`) actually change the chosen path — not just that the FE renders.
+
+First-time setup — install the Chromium binary Playwright drives:
+
+```bash
+uv run --group test playwright install chromium
+```
+
+The FE bundle must be built before running the suite (the integration server serves `src/static/`):
+
+```bash
+cd frontend && npm install && npm run build && cd ..
+```
+
+Then run:
+
+```bash
+uv run --group test pytest tests/integration/ -x -q
+```
+
+Layout:
+
+- `tests/seeds/topology.py` — 4 systems wired so the direct origin→dest hop is out of Carrier range; the planner must pick one of two two-hop branches.
+- `tests/seeds/scenarios.py` — named threat-data fixtures (`empty`, `kills_on_danger`, `jumps_on_danger`, `activity_on_danger`, `zkill_intel`).
+- `tests/seeds/build_cache.py` — writes a fresh `cache.sqlite` for a scenario; tests call `reseed("scenario_name")` between assertions.
+- `tests/integration/` — Playwright tests grouped by concern (smoke, route render, swap, threat weighting, threat modal).
+
+To run a single test:
+
+```bash
+uv run --group test pytest tests/integration/test_threat_weighting.py::test_kills_reroute_via_safe_at_default_weight -x
+```
+
+Debug a failing test interactively (headed browser, slow-mo):
+
+```bash
+PWDEBUG=1 uv run --group test pytest tests/integration/test_fe_swap.py -x
+```
+
 ## Stack
 
 - **Backend:** Python 3.13, Flask, Flask-SQLAlchemy, SQLite (EVE SDE, read-only)

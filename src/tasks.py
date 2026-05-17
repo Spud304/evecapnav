@@ -21,6 +21,9 @@ logger = logging.getLogger(__name__)
 
 
 def _instance_path() -> str:
+    override = os.environ.get("EVECAPNAV_INSTANCE_PATH")
+    if override:
+        return override
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), "instance")
 
 
