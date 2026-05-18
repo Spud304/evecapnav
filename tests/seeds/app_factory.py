@@ -31,6 +31,7 @@ from tests.seeds.topology import (
     SHIP_TYPES,
     SHIP_GROUPS,
     SHIP_DOGMA,
+    STARGATE_PAIRS,
 )
 
 
@@ -128,6 +129,47 @@ def _seed_topology() -> None:
             planet_id += 1
 
     db.session.commit()
+
+    # Stargates — both mapStargate and StargateDestination are ORM tables
+    # provisioned by db.create_all() from src/models/models.py. Use raw SQL
+    # so we don't have to import the ORM class for a one-shot insert. Mirror
+    # each pair so each gate is directional A→B + B→A; the planner reads it
+    # as undirected via the SELF-JOIN in build_gate_graph.
+    with db.engine.connect() as conn:
+        for sg_a, sys_a, sg_b, sys_b in STARGATE_PAIRS:
+            # Gate sg_a is physically located in sys_a and warps you to sys_b.
+            conn.execute(
+                text(
+                    "INSERT OR REPLACE INTO mapStargate "
+                    "(stargateID, solarSystemID, x, y, z) "
+                    "VALUES (:gid, :sys, '0', '0', '0')"
+                ),
+                {"gid": sg_a, "sys": sys_a},
+            )
+            conn.execute(
+                text(
+                    "INSERT OR REPLACE INTO StargateDestination "
+                    "(stargateID, solarSystemID) VALUES (:gid, :sys)"
+                ),
+                {"gid": sg_a, "sys": sys_b},
+            )
+            # Paired return gate sg_b in sys_b → sys_a.
+            conn.execute(
+                text(
+                    "INSERT OR REPLACE INTO mapStargate "
+                    "(stargateID, solarSystemID, x, y, z) "
+                    "VALUES (:gid, :sys, '0', '0', '0')"
+                ),
+                {"gid": sg_b, "sys": sys_b},
+            )
+            conn.execute(
+                text(
+                    "INSERT OR REPLACE INTO StargateDestination "
+                    "(stargateID, solarSystemID) VALUES (:gid, :sys)"
+                ),
+                {"gid": sg_b, "sys": sys_a},
+            )
+        conn.commit()
 
 
 def create_integration_app(instance_path: str) -> Application:

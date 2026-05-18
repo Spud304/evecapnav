@@ -96,8 +96,11 @@ def browser_context_args(browser_context_args):
     """Default pytest-playwright context args + a viewport.
 
     Tests can override per-test; this just keeps screenshots/videos sane.
+    Clipboard permissions are granted so the Copy-as-text tests can read
+    navigator.clipboard back from the page.
     """
     return {
         **browser_context_args,
         "viewport": {"width": 1400, "height": 900},
+        "permissions": ["clipboard-read", "clipboard-write"],
     }

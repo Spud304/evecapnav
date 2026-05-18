@@ -76,3 +76,29 @@ SHIP_GROUPS = [
     (547, 6),  # Carrier
     (902, 6),  # Jump Freighter
 ]
+
+# Stargate seed. Each gate is two rows: one in mapStargate (source system) and
+# one in StargateDestination (destination system), sharing a stargateID — see
+# the join in src/jump_graph.py::build_gate_graph. A bidirectional connection
+# between A and B therefore needs two stargate IDs (one per direction).
+#
+# Gates chosen so:
+#   - Origin has 2 gates (to Danger + to Dest) → not dead end
+#   - Danger has 3 gates (to Origin, Dest, SafeA) → not dead end
+#   - Dest has 2 gates (to Origin, Danger) → not dead end
+#   - SafeA has 1 gate (to Danger) → DEAD END pill target
+#   - SafeB has 0 gates
+#
+# Limiting dead-end status to one mid-route system keeps the dead_end_bonus
+# from collapsing the cost margin in threat-weighting tests (dead-end systems
+# get -100 cost in mode=safe, see src/pathfinder.py). The triangle
+# Origin↔Danger↔Dest also gives gate-mode tests a connected 3-system network
+# so we can drive Gate-pill rendering with JDC=0 (jump range too short, gates
+# become the only option).
+STARGATE_PAIRS = [
+    # (stargate_id_A_to_B, system_A, stargate_id_B_to_A, system_B)
+    (50000001, ORIGIN_ID, 50000002, DANGER_ID),
+    (50000003, DANGER_ID, 50000004, DEST_ID),
+    (50000005, ORIGIN_ID, 50000006, DEST_ID),
+    (50000007, DANGER_ID, 50000008, SAFE_A_ID),
+]
