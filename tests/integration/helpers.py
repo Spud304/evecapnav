@@ -25,8 +25,8 @@ def select_system(page: Page, label: str, system_name: str) -> None:
 def plan_route(page: Page) -> None:
     """Click the Plan Route button and wait for the result table to render."""
     page.get_by_role("button", name="Plan Route").click()
-    # Result is rendered once the summary card with "Total Jumps" shows up.
-    page.get_by_text("Total Jumps", exact=True).wait_for(
+    # Result is rendered once the summary card with "Total Hops" shows up.
+    page.get_by_text("Total Hops", exact=True).wait_for(
         state="visible", timeout=10_000
     )
 
@@ -203,7 +203,7 @@ def collapse_alternatives(page: Page, hop_index: int) -> None:
 def read_summary_card(page: Page) -> dict[str, str]:
     """Return the four summary cards as `{label: primary_value}`."""
     out: dict[str, str] = {}
-    for label in ("Total Jumps", "Fuel", "Total Wait", "Quietest Window"):
+    for label in ("Total Hops", "Fuel", "Total Wait", "Quietest Window"):
         cell = page.get_by_text(label, exact=True).locator("..")
         # The bold primary value lives in the .text-[18px] inner div.
         out[label] = cell.locator(".text-\\[18px\\]").first.inner_text().strip()

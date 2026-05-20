@@ -79,8 +79,8 @@ def test_result_clears_on_subsequent_no_route(
     expect(page.get_by_text("No route found at this ship", exact=False)).to_be_visible(
         timeout=15_000
     )
-    # The summary card ("Total Jumps") should no longer be on the page.
-    expect(page.get_by_text("Total Jumps", exact=True)).to_have_count(0)
+    # The summary card ("Total Hops") should no longer be on the page.
+    expect(page.get_by_text("Total Hops", exact=True)).to_have_count(0)
 
 
 def test_progress_banner_clears_after_completion(

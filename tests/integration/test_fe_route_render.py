@@ -25,6 +25,6 @@ def test_basic_route_renders_table_and_summary(
     assert names[1] == "ItgDanger"
 
     # Summary card shows total jumps = 2.
-    expect(page.get_by_text("Total Jumps", exact=True)).to_be_visible()
-    summary = page.get_by_text("Total Jumps", exact=True).locator("..")
+    expect(page.get_by_text("Total Hops", exact=True)).to_be_visible()
+    summary = page.get_by_text("Total Hops", exact=True).locator("..")
     expect(summary).to_contain_text("2")

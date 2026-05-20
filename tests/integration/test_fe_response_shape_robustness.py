@@ -99,12 +99,12 @@ def test_zero_total_jumps_with_empty_steps_hides_summary(
     page.goto(base_url)
     select_system(page, "Origin", "ItgOrigin")
     select_system(page, "Destination", "ItgDest")
-    # Don't use plan_route — it waits on Total Jumps which we expect NOT to render.
+    # Don't use plan_route — it waits on Total Hops which we expect NOT to render.
     page.get_by_role("button", name="Plan Route").click()
-    # Give the SSE handler a moment to settle; if Total Jumps was going to
+    # Give the SSE handler a moment to settle; if Total Hops was going to
     # appear, it would by now.
     page.wait_for_timeout(500)
-    expect(page.get_by_text("Total Jumps", exact=True)).to_have_count(0)
+    expect(page.get_by_text("Total Hops", exact=True)).to_have_count(0)
 
 
 def test_sov_owner_empty_string_omits_subtext(page: Page, base_url: str) -> None:

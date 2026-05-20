@@ -64,17 +64,31 @@ def test_jdc_zero_drops_range_below_jump_edge(
 def test_initial_fatigue_carries_over_to_first_hop(
     page: Page, base_url: str, reseed
 ) -> None:
+    """Verify the initial_fatigue form field is sent in the API request.
+
+    The multi-label search inserts a fatigue-decay wait at the origin before
+    the first JD, so the origin row's Fatigue cell now shows the post-wait
+    value (10m) rather than the entered 60m. The form control itself is
+    still doing its job — we assert that by inspecting the outgoing request
+    URL contains `initial_fatigue=60`."""
     reseed("empty")
     page.goto(base_url)
     select_system(page, "Origin", "ItgOrigin")
     select_system(page, "Destination", "ItgDest")
     set_initial_fatigue(page, 60)
+
+    seen_urls: list[str] = []
+    page.on("request", lambda r: seen_urls.append(r.url) if "/api/route" in r.url else None)
+
     plan_route(page)
-    # Origin row's Fatigue cell should reflect the carry-over (not "0m").
-    fatigue_cell = (
-        route_data_rows(page).nth(0).locator("td").nth(5).inner_text().strip()
+
+    assert any("initial_fatigue=60" in u for u in seen_urls), seen_urls
+    # First hop should include a wait > 0 — the search decayed the entered
+    # fatigue before the first jump rather than burning it into a worse cooldown.
+    first_hop_wait = (
+        route_data_rows(page).nth(1).locator("td").nth(4).inner_text().strip()
     )
-    assert "1h" in fatigue_cell or "60" in fatigue_cell, fatigue_cell
+    assert first_hop_wait not in {"—", "0m"}, first_hop_wait
 
 
 def test_jfc_sent_in_request_url(page: Page, base_url: str, reseed) -> None:
