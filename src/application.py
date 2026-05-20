@@ -16,6 +16,8 @@ class Application(Flask):
         self.add_url_rule("/health", "health", self.health, methods=["GET"])
 
     def index(self):
+        # static_folder is always set in __init__; assert for the type checker.
+        assert self.static_folder is not None
         return send_from_directory(self.static_folder, "index.html")
 
     def health(self) -> str:

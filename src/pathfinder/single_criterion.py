@@ -1,86 +1,34 @@
+"""Legacy single-criterion A* pathfinder.
+
+Retained as a no-route fallback for the multi-label dispatcher and to power
+post-hoc fatigue simulation on a fixed path (used by `swap_hop`).
+"""
+
 import heapq
 import logging
-import math
 from collections import deque
-from dataclasses import dataclass, asdict
 from typing import Callable
 
 from src.constants import (
-    MAX_FATIGUE_MINUTES,
-    MAX_COOLDOWN_MINUTES,
-    BASE_SYSTEM_COST,
-    DISTANCE_EXPONENT,
-    DANGER_WEIGHT,
-    JUMPS_WEIGHT,
     ACTIVITY_WEIGHT,
-    POS_MOON_BONUS,
-    DEAD_END_BONUS,
+    BASE_SYSTEM_COST,
+    DANGER_WEIGHT,
+    DEAD_END_PENALTY,
+    DISTANCE_EXPONENT,
     GATE_EQUIVALENT_JUMPS,
     GATE_JUMP_REFERENCE_LY,
     GATE_TRAVEL_SECONDS,
+    JUMPS_WEIGHT,
+    POS_MOON_BONUS,
 )
-from src.systems import SystemInfo, compute_distance_ly
+from src.schemas.system import SystemInfo
+from src.pathfinder.cost import compute_distance_ly, compute_fatigue, compute_fuel_cost
+from src.pathfinder.types import RouteStep
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class RouteStep:
-    system_id: int
-    system_name: str
-    security: float
-    distance_ly: float
-    wait_minutes: float
-    fatigue_after_minutes: float
-    fuel_cost: int
-    kills_per_hour: int
-    jumps_per_hour: int
-    safe_spot_au: float
-    safe_spot_warp: str
-    safe_spot_nearest: str
-    moon_count: int
-    gate_count: int
-    sov_owner: str
-    edge_type: str = "jump"  # "jump" for jump-drive hops, "gate" for stargate hops
-
-    def to_dict(self) -> dict:
-        return asdict(self)
-
-
-def compute_fatigue(
-    current_fatigue_min: float,
-    distance_ly: float,
-    fatigue_multiplier: float,
-    extra_wait_min: float = 0.0,
-) -> tuple[float, float]:
-    """Compute new fatigue and total wait after a jump.
-
-    All values in minutes.
-    Returns (fatigue_after_waiting, total_wait_minutes).
-
-    EVE formulas (post-March-2018):
-      cooldown = min(30, max(fatigue/10, 1 + ly * fatigue_multiplier))   # red timer caps at 30 min
-      new_fatigue = min(300, max(fatigue, 10) * (1 + ly * fatigue_multiplier))  # blue timer caps at 5 h
-      fatigue decays 1:1 with real time during the wait period
-    """
-    factor = distance_ly * fatigue_multiplier
-    cooldown = min(MAX_COOLDOWN_MINUTES, max(current_fatigue_min / 10.0, 1.0 + factor))
-    raw_fatigue = min(
-        MAX_FATIGUE_MINUTES, max(current_fatigue_min, 10.0) * (1.0 + factor)
-    )
-    total_wait = cooldown + extra_wait_min
-    fatigue_after = max(0.0, raw_fatigue - total_wait)
-    return fatigue_after, total_wait
-
-
-def compute_fuel_cost(
-    distance_ly: float, fuel_per_ly: float, jfc_level: int = 0
-) -> int:
-    """Compute isotope fuel cost for a jump."""
-    return math.ceil(distance_ly * fuel_per_ly * (1.0 - 0.10 * jfc_level))
-
-
-def find_route(
+def _find_route_single_criterion(
     origin_id: int,
     dest_id: int,
     systems: dict[int, SystemInfo],
@@ -101,24 +49,24 @@ def find_route(
     danger_weight: int = DANGER_WEIGHT,
     jumps_weight: int = JUMPS_WEIGHT,
     activity_weight: int = ACTIVITY_WEIGHT,
-    dead_end_bonus: int = DEAD_END_BONUS,
+    dead_end_penalty: int = DEAD_END_PENALTY,
     pos_moon_bonus: int = POS_MOON_BONUS,
     gate_graph: dict[int, list[tuple[int, bool, bool]]] | None = None,
     gate_mode: str = "off",
     gate_equivalent_jumps: float = GATE_EQUIVALENT_JUMPS,
 ) -> list[RouteStep]:
-    """A* search to find optimal jump route, then simulate fatigue.
+    """Single-criterion A* search (state = system_id only).
 
-    State is system_id only (no fatigue tracking in search).
-    Distance is raised to distance_exponent (default 1.5) so the algorithm
-    penalizes long jumps proportionally to their fatigue impact.
-    Modes:
-      - "safe": cost = dist^exp + danger penalty (avoids kills/traffic)
-      - "direct": cost = dist^exp only (shortest path with fatigue awareness)
-      - "pos": cost = dist^exp + danger - moon bonus (prefers moon-rich systems)
-    Fatigue is simulated on the found path afterward.
+    Retained as (a) the cost-horizon seed for the multi-label search and
+    (b) the no-route fallback. Distance is raised to distance_exponent
+    (default 1.5) so longer jumps are penalized roughly in line with their
+    fatigue impact; fatigue is then *simulated* on the found path.
     """
-    if origin_id not in systems or dest_id not in systems:
+    if origin_id not in systems:
+        logger.warning("[SC] origin %d not in systems dict", origin_id)
+        return []
+    if dest_id not in systems:
+        logger.warning("[SC] dest %d not in systems dict", dest_id)
         return []
 
     effective_range = base_range_ly * (1 + 0.20 * jdc_level)
@@ -130,6 +78,14 @@ def find_route(
     gates_enabled = gate_mode in ("interregional", "all") and gate_graph is not None
     gate_unit_cost = GATE_JUMP_REFERENCE_LY**distance_exponent
     gate_edge_cost = gate_equivalent_jumps * gate_unit_cost
+    logger.info(
+        "[SC] START origin=%d dest=%d eff_range=%.2fLY mode=%s gates=%s",
+        origin_id,
+        dest_id,
+        effective_range,
+        mode,
+        gate_mode,
+    )
 
     def _progress(msg: str) -> None:
         if on_progress:
@@ -201,6 +157,14 @@ def find_route(
         est_total, cost_so_far, sys_id = heapq.heappop(open_set)
 
         if sys_id == dest_id:
+            logger.info(
+                "[SC] REACHED DEST at explored=%d cost=%.2f best_cost_entries=%d "
+                "heap_remaining=%d",
+                explored,
+                cost_so_far,
+                len(best_cost),
+                len(open_set),
+            )
             _progress(f"Path found! Explored {explored} systems.")
             path = _reconstruct_path(sys_id, came_from)
             _progress("Simulating fatigue and fuel costs...")
@@ -269,7 +233,10 @@ def find_route(
                 if mode == "pos":
                     danger_cost -= neighbor.moon_count * pos_moon_bonus
                 if mode == "safe" and neighbor.gate_count == 1:
-                    danger_cost -= dead_end_bonus
+                    # Dead-end systems are camp-prone (one entry/exit means
+                    # hostiles only need to watch one gate). Penalize them
+                    # in safe mode.
+                    danger_cost += dead_end_penalty
                 # Clamp to zero — negative costs break A* admissibility
                 extra_cost = max(0, danger_cost)
 
@@ -285,6 +252,21 @@ def find_route(
                 est = new_cost + heuristic(neighbor_id)
                 heapq.heappush(open_set, (est, new_cost, neighbor_id))
 
+    logger.warning(
+        "[SC] NO ROUTE FOUND. explored=%d best_cost_entries=%d "
+        "dest_in_best_cost=%s heap_size_at_end=%d",
+        explored,
+        len(best_cost),
+        dest_id in best_cost,
+        len(open_set),
+    )
+    if dest_id in best_cost:
+        logger.warning(
+            "[SC] dest_id %d HAD a best_cost entry (%.2f) — implies it was "
+            "reached but never popped. Heuristic admissibility bug?",
+            dest_id,
+            best_cost[dest_id],
+        )
     _progress("No route found.")
     return []
 
@@ -430,30 +412,18 @@ def find_optimal_wait(
     danger: dict[int, dict],
     jfc_level: int = 0,
 ) -> tuple[list[RouteStep], float]:
-    """Find the extra wait per hop that minimizes total trip time.
-
-    Tests wait times from 0 to 120 minutes in 5-minute increments.
-    Keeps the best result to avoid recomputing.
+    """Backwards-compat shim. The multi-label `find_route` already picks waits
+    implicitly via fatigue-wait pseudo-edges, so this just simulates the given
+    path with zero extra wait and reports zero "extra" wait.
     """
-    best_wait = 0.0
-    best_total = float("inf")
-    best_steps: list[RouteStep] = []
-
-    for extra_wait in range(0, 125, 5):
-        steps = _simulate_route(
-            path,
-            systems,
-            fatigue_multiplier,
-            fuel_per_ly,
-            initial_fatigue_min,
-            danger,
-            extra_wait_min=float(extra_wait),
-            jfc_level=jfc_level,
-        )
-        total_time = sum(s.wait_minutes for s in steps)
-        if total_time < best_total:
-            best_total = total_time
-            best_wait = float(extra_wait)
-            best_steps = steps
-
-    return best_steps, best_wait
+    steps = _simulate_route(
+        path,
+        systems,
+        fatigue_multiplier,
+        fuel_per_ly,
+        initial_fatigue_min,
+        danger,
+        extra_wait_min=0.0,
+        jfc_level=jfc_level,
+    )
+    return steps, 0.0

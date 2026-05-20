@@ -185,6 +185,7 @@ export default function RouteTable({
                   </tr>
                   {isExpanded && alts.length > 0 && (
                     <tr>
+                      {/* colSpan covers the widest case (11 cols at xl+) */}
                       <td colSpan={11} className="p-0">
                         <div className="bg-[#fafbfc] border-b border-[var(--color-line-soft)] px-4 py-3 text-[11.5px]">
                           <div className="text-[var(--color-muted)] mb-2 font-semibold uppercase tracking-wider text-[11px]">

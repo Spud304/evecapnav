@@ -68,3 +68,28 @@ export interface SystemSearchResult {
   name: string;
   security: number;
 }
+
+export interface MapSystem {
+  id: number;
+  name: string;
+  x: number;
+  y: number;
+  sec: number;
+  region_id: number;
+  sov: string;
+}
+
+export interface MapRegion {
+  id: number;
+  name: string;
+  x: number;
+  y: number;
+  system_count: number;
+}
+
+export interface MapData {
+  systems: MapSystem[];
+  regions: MapRegion[];
+  // gate edges as flat tuples [src_id, dst_id, cross_region (0|1)]
+  gate_edges: [number, number, number][];
+}

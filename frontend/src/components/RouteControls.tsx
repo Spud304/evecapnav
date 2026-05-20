@@ -8,8 +8,22 @@ const DEFAULT_WEIGHTS = {
   distance_exponent: 1.5,
   danger_weight: 600,
   jumps_weight: 60,
-  dead_end_bonus: 100,
+  activity_weight: 30,
+  dead_end_penalty: 100,
   pos_moon_bonus: 5,
+  wait_weight: 0.2,
+};
+
+// Slider mapping: 0 (Quickest) → wait_weight 0.05; 100 (Least Jumps) → 20.
+// Linear scale; default 0.2 lands near the "Quickest" end which mirrors the
+// pre-multi-label behavior (small fatigue penalty).
+const WAIT_WEIGHT_MIN = 0.05;
+const WAIT_WEIGHT_MAX = 20;
+const sliderToWaitWeight = (s: number): number =>
+  WAIT_WEIGHT_MIN + (s / 100) * (WAIT_WEIGHT_MAX - WAIT_WEIGHT_MIN);
+const waitWeightToSlider = (w: number): number => {
+  const raw = ((w - WAIT_WEIGHT_MIN) / (WAIT_WEIGHT_MAX - WAIT_WEIGHT_MIN)) * 100;
+  return Math.max(0, Math.min(100, raw));
 };
 
 export interface RouteParams {
@@ -23,17 +37,22 @@ export interface RouteParams {
   distance_exponent: number;
   danger_weight: number;
   jumps_weight: number;
-  dead_end_bonus: number;
+  activity_weight: number;
+  dead_end_penalty: number;
   pos_moon_bonus: number;
+  wait_weight: number;
 }
 
 interface Props {
   onResult: (result: RouteResult, params: RouteParams) => void;
   onError: (msg: string) => void;
   onProgress: (msg: string) => void;
+  /** Fires whenever the user picks an origin or destination from the
+   *  autocomplete, so the parent can pan/focus the map there. */
+  onSystemFocus?: (id: number) => void;
 }
 
-export default function RouteControls({ onResult, onError, onProgress }: Props) {
+export default function RouteControls({ onResult, onError, onProgress, onSystemFocus }: Props) {
   const [shipClasses, setShipClasses] = useState<ShipClass[]>([]);
   const [originId, setOriginId] = useState<number | null>(null);
   const [destId, setDestId] = useState<number | null>(null);
@@ -54,8 +73,10 @@ export default function RouteControls({ onResult, onError, onProgress }: Props) 
   const [distanceExponent, setDistanceExponent] = useState(DEFAULT_WEIGHTS.distance_exponent);
   const [dangerWeight, setDangerWeight] = useState(DEFAULT_WEIGHTS.danger_weight);
   const [jumpsWeight, setJumpsWeight] = useState(DEFAULT_WEIGHTS.jumps_weight);
-  const [deadEndBonus, setDeadEndBonus] = useState(DEFAULT_WEIGHTS.dead_end_bonus);
+  const [activityWeight, setActivityWeight] = useState(DEFAULT_WEIGHTS.activity_weight);
+  const [deadEndPenalty, setDeadEndPenalty] = useState(DEFAULT_WEIGHTS.dead_end_penalty);
   const [posMoonBonus, setPosMoonBonus] = useState(DEFAULT_WEIGHTS.pos_moon_bonus);
+  const [waitWeight, setWaitWeight] = useState(DEFAULT_WEIGHTS.wait_weight);
 
   useEffect(() => {
     getShipClasses().then((classes) => {
@@ -90,8 +111,10 @@ export default function RouteControls({ onResult, onError, onProgress }: Props) 
       distance_exponent: distanceExponent,
       danger_weight: dangerWeight,
       jumps_weight: jumpsWeight,
-      dead_end_bonus: deadEndBonus,
+      activity_weight: activityWeight,
+      dead_end_penalty: deadEndPenalty,
       pos_moon_bonus: posMoonBonus,
+      wait_weight: waitWeight,
     };
 
     esRef.current = planRouteSSE(
@@ -129,8 +152,10 @@ export default function RouteControls({ onResult, onError, onProgress }: Props) 
               distance_exponent: distanceExponent,
               danger_weight: dangerWeight,
               jumps_weight: jumpsWeight,
-              dead_end_bonus: deadEndBonus,
+              activity_weight: activityWeight,
+              dead_end_penalty: deadEndPenalty,
               pos_moon_bonus: posMoonBonus,
+              wait_weight: waitWeight,
             });
           }
         },
@@ -147,8 +172,10 @@ export default function RouteControls({ onResult, onError, onProgress }: Props) 
     setDistanceExponent(DEFAULT_WEIGHTS.distance_exponent);
     setDangerWeight(DEFAULT_WEIGHTS.danger_weight);
     setJumpsWeight(DEFAULT_WEIGHTS.jumps_weight);
-    setDeadEndBonus(DEFAULT_WEIGHTS.dead_end_bonus);
+    setActivityWeight(DEFAULT_WEIGHTS.activity_weight);
+    setDeadEndPenalty(DEFAULT_WEIGHTS.dead_end_penalty);
     setPosMoonBonus(DEFAULT_WEIGHTS.pos_moon_bonus);
+    setWaitWeight(DEFAULT_WEIGHTS.wait_weight);
   }
 
   const isJf = shipClass === 'Jump Freighter';
@@ -162,10 +189,22 @@ export default function RouteControls({ onResult, onError, onProgress }: Props) 
       <div className="card-body">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-x-[18px] gap-y-[14px]">
           <div className="flex flex-col">
-            <SystemSearch label="Origin" onSelect={(id) => setOriginId(id)} />
+            <SystemSearch
+              label="Origin"
+              onSelect={(id) => {
+                setOriginId(id);
+                onSystemFocus?.(id);
+              }}
+            />
           </div>
           <div className="flex flex-col">
-            <SystemSearch label="Destination" onSelect={(id) => setDestId(id)} />
+            <SystemSearch
+              label="Destination"
+              onSelect={(id) => {
+                setDestId(id);
+                onSystemFocus?.(id);
+              }}
+            />
           </div>
           <div className="flex flex-col">
             <label className="field-label">Ship class</label>
@@ -294,6 +333,30 @@ export default function RouteControls({ onResult, onError, onProgress }: Props) 
           )}
         </div>
 
+        <div className="mt-4 pt-[14px] border-t border-[var(--color-line-soft)]">
+          <div className="flex items-center justify-between mb-1">
+            <label className="field-label !mb-0">Route preference</label>
+            <span className="text-[11px] text-[var(--color-muted)]">
+              wait_weight = {waitWeight.toFixed(2)}
+            </span>
+          </div>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={1}
+            value={waitWeightToSlider(waitWeight)}
+            onChange={(e) =>
+              setWaitWeight(sliderToWaitWeight(Number(e.target.value)))
+            }
+            className="w-full"
+          />
+          <div className="flex justify-between text-[11px] text-[var(--color-muted)] mt-[3px]">
+            <span>Least jumps (tolerate fatigue, fewer JD hops)</span>
+            <span>Quickest (avoid fatigue waits, more hops OK)</span>
+          </div>
+        </div>
+
         <div className="mt-4 pt-[14px] border-t border-[var(--color-line-soft)] flex items-center gap-3">
           {mode !== 'direct' && (
             <button
@@ -363,13 +426,34 @@ export default function RouteControls({ onResult, onError, onProgress }: Props) 
                 className="input w-[80px] py-1 px-2 text-[12px]"
               />
             </label>
+            <label className="flex justify-between items-center gap-2">
+              <span>Activity weight</span>
+              <input
+                type="number"
+                value={activityWeight}
+                onChange={(e) => setActivityWeight(Number(e.target.value))}
+                min={0}
+                className="input w-[80px] py-1 px-2 text-[12px]"
+              />
+            </label>
+            <label className="flex justify-between items-center gap-2">
+              <span>Wait weight (override)</span>
+              <input
+                type="number"
+                value={waitWeight}
+                onChange={(e) => setWaitWeight(Number(e.target.value))}
+                min={0}
+                step={0.05}
+                className="input w-[80px] py-1 px-2 text-[12px]"
+              />
+            </label>
             {mode === 'safe' && (
               <label className="flex justify-between items-center gap-2">
-                <span>Dead-end bonus</span>
+                <span>Dead-end penalty</span>
                 <input
                   type="number"
-                  value={deadEndBonus}
-                  onChange={(e) => setDeadEndBonus(Number(e.target.value))}
+                  value={deadEndPenalty}
+                  onChange={(e) => setDeadEndPenalty(Number(e.target.value))}
                   min={0}
                   className="input w-[80px] py-1 px-2 text-[12px]"
                 />

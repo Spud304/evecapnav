@@ -31,3 +31,9 @@ ignore = ["E402"]
 
 [tool.ruff.lint.per-file-ignores]
 "migrations/*" = ["ALL"]
+
+[tool.ty.rules]
+# flask-sqlalchemy's `db.Model` is a dynamically-created class. ty can't
+# build a consistent MRO for it, so it warns on every ORM model. The
+# models work fine at runtime — this is a known type-checker limitation.
+unsupported-base = "ignore"

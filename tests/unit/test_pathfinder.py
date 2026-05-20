@@ -1,6 +1,13 @@
 import math
 
-from src.pathfinder import compute_fatigue, compute_fuel_cost, find_route
+from src.pathfinder import (
+    compute_fatigue,
+    compute_fuel_cost,
+    find_route,
+    find_optimal_wait,
+    _find_route_single_criterion,
+    _simulate_route,
+)
 from src.systems import SystemInfo
 from src.constants import MAX_FATIGUE_MINUTES
 
@@ -276,9 +283,13 @@ class TestRegionalGates:
         )
         gate_step = next(s for s in steps if s.edge_type == "gate")
         assert gate_step.fuel_cost == 0
-        # Fatigue is unchanged across the gate hop (no jump-drive activity)
+        # Gates don't ADD fatigue, but the multi-label search may merge a
+        # fatigue-decay wait into the gate step's display when the next
+        # move is a JD that benefits from a lower starting fatigue. So
+        # the post-step fatigue can only stay the same or decrease across
+        # a gate hop — never increase.
         prev = steps[steps.index(gate_step) - 1]
-        assert gate_step.fatigue_after_minutes == prev.fatigue_after_minutes
+        assert gate_step.fatigue_after_minutes <= prev.fatigue_after_minutes
 
     def test_interregional_intra_region_gate_treated_as_one_jump(self):
         """In 'interregional' mode, intra-region gates are still available as
@@ -486,3 +497,205 @@ class TestRegionalGates:
         # The router still finds a route to D regardless of which option won
         assert steps[0].system_id == 1
         assert steps[-1].system_id == 4
+
+
+class TestBicriterionRouting:
+    """Tests for the new multi-label (cost + fatigue) Dijkstra search."""
+
+    LY = 9.461e15
+
+    def _three_systems_inline(self, b_dist_ly: float, c_dist_ly: float):
+        """A 3-system inline graph: A(0) -- B -- C, JD-only.
+
+        b_dist_ly is the A→B distance, c_dist_ly is the B→C distance.
+        Returns (systems, graph).
+        """
+        ly = self.LY
+        systems = {
+            1: SystemInfo(1, "A", -0.5, 0.0, 0.0, 0.0, 1),
+            2: SystemInfo(2, "B", -0.5, b_dist_ly * ly, 0.0, 0.0, 1),
+            3: SystemInfo(
+                3, "C", -0.5, (b_dist_ly + c_dist_ly) * ly, 0.0, 0.0, 1
+            ),
+        }
+        graph = {
+            1: [(2, b_dist_ly)],
+            2: [(1, b_dist_ly), (3, c_dist_ly)],
+            3: [(2, c_dist_ly)],
+        }
+        return systems, graph
+
+    def test_wait_pseudo_edge_chosen_when_route_requires_long_jumps(self):
+        """A pair of long jumps in a row produces high fatigue + cooldown.
+        The multi-label search should still complete the route and the
+        intermediate hop should carry a positive wait_minutes value
+        (the mandatory cooldown plus any chosen fatigue-decay wait)."""
+        # 9 LY + 9 LY route at JD range 10 LY (e.g. Rorqual at JDC 5)
+        systems, graph = self._three_systems_inline(9.0, 9.0)
+        steps = find_route(
+            origin_id=1,
+            dest_id=3,
+            systems=systems,
+            graph=graph,
+            base_range_ly=10.0,
+            jdc_level=0,
+            fatigue_multiplier=1.0,
+            fuel_per_ly=1000,
+            mode="direct",
+        )
+        assert len(steps) == 3  # A → B → C
+        assert steps[0].system_id == 1
+        assert steps[1].system_id == 2
+        assert steps[2].system_id == 3
+        # Hop 2 (the intermediate landing at B) must include a wait > 0
+        # because the next jump from B can't activate while cooldown > 0.
+        assert steps[1].wait_minutes > 0.0
+
+    def test_high_wait_weight_picks_fewer_hops(self):
+        """With high wait_weight, the search prefers a single long jump over
+        two short jumps + a wait, because waiting is expensive."""
+        # Two-path topology:
+        #   Path A (1 long jump):  origin → dest directly at 8 LY
+        #   Path B (2 short jumps): origin → mid → dest at 5 + 4 LY
+        ly = self.LY
+        systems = {
+            1: SystemInfo(1, "Origin", -0.5, 0.0, 0.0, 0.0, 1),
+            2: SystemInfo(2, "Mid", -0.5, 5.0 * ly, 0.0, 0.0, 1),
+            3: SystemInfo(3, "Dest", -0.5, 8.0 * ly, 0.0, 0.0, 1),
+        }
+        graph = {
+            1: [(2, 5.0), (3, 8.0)],
+            2: [(1, 5.0), (3, 4.0)],
+            3: [(1, 8.0), (2, 4.0)],
+        }
+        # Very high wait_weight ≈ "Least Jumps" preset (waits are expensive)
+        steps = find_route(
+            origin_id=1,
+            dest_id=3,
+            systems=systems,
+            graph=graph,
+            base_range_ly=10.0,
+            jdc_level=0,
+            fatigue_multiplier=1.0,
+            fuel_per_ly=1000,
+            mode="direct",
+            wait_weight=999.0,
+        )
+        # Direct hop (2 steps: origin + dest) wins under high wait_weight
+        assert len(steps) == 2
+        assert steps[-1].system_id == 3
+
+    def test_no_route_falls_back_to_single_criterion(self):
+        """When multi-label search returns nothing (unreachable), dispatcher
+        falls back to single-criterion which also correctly returns []."""
+        ly = self.LY
+        systems = {
+            1: SystemInfo(1, "A", -0.5, 0.0, 0.0, 0.0, 1),
+            2: SystemInfo(2, "B", -0.5, 100.0 * ly, 0.0, 0.0, 1),
+        }
+        graph = {1: [], 2: []}  # no edges
+        steps = find_route(
+            origin_id=1,
+            dest_id=2,
+            systems=systems,
+            graph=graph,
+            base_range_ly=5.0,
+            jdc_level=0,
+            fatigue_multiplier=1.0,
+            fuel_per_ly=1000,
+        )
+        assert steps == []
+
+    def test_dispatcher_matches_single_criterion_on_short_route(self):
+        """On a trivial route where fatigue isn't a concern, multi-label
+        and single-criterion should agree on system_id endpoints."""
+        ly = self.LY
+        systems = {
+            1: SystemInfo(1, "A", -0.5, 0.0, 0.0, 0.0, 1),
+            2: SystemInfo(2, "B", -0.5, 3.0 * ly, 0.0, 0.0, 1),
+        }
+        graph = {1: [(2, 3.0)], 2: [(1, 3.0)]}
+        ml_steps = find_route(
+            origin_id=1,
+            dest_id=2,
+            systems=systems,
+            graph=graph,
+            base_range_ly=5.0,
+            jdc_level=0,
+            fatigue_multiplier=1.0,
+            fuel_per_ly=1000,
+            mode="direct",
+        )
+        sc_steps = _find_route_single_criterion(
+            origin_id=1,
+            dest_id=2,
+            systems=systems,
+            graph=graph,
+            base_range_ly=5.0,
+            jdc_level=0,
+            fatigue_multiplier=1.0,
+            fuel_per_ly=1000,
+            mode="direct",
+        )
+        assert [s.system_id for s in ml_steps] == [s.system_id for s in sc_steps]
+
+    def test_find_optimal_wait_is_noop(self):
+        """find_optimal_wait should return (simulated_steps, 0.0) — the
+        multi-label search picks waits implicitly so the old sweep is gone."""
+        ly = self.LY
+        systems = {
+            1: SystemInfo(1, "A", -0.5, 0.0, 0.0, 0.0, 1),
+            2: SystemInfo(2, "B", -0.5, 5.0 * ly, 0.0, 0.0, 1),
+        }
+        path = [1, 2]
+        steps, extra_wait = find_optimal_wait(
+            path=path,
+            systems=systems,
+            fatigue_multiplier=1.0,
+            fuel_per_ly=1000,
+            initial_fatigue_min=0.0,
+            danger={},
+        )
+        # Shim returns zero extra wait and the simulate_route output
+        assert extra_wait == 0.0
+        baseline = _simulate_route(
+            path, systems, 1.0, 1000, 0.0, {}, extra_wait_min=0.0
+        )
+        assert [s.system_id for s in steps] == [s.system_id for s in baseline]
+        assert [s.wait_minutes for s in steps] == [s.wait_minutes for s in baseline]
+
+    def test_gate_only_route_via_multi_label(self):
+        """Multi-label search handles gate edges with no JD edges available
+        (e.g. for a sub-cap-equivalent route). Same gate-mode plumbing as
+        the legacy A* path."""
+        ly = self.LY
+        systems = {
+            1: SystemInfo(1, "A", -0.5, 0.0, 0.0, 0.0, region_id=10, constellation_id=100),
+            2: SystemInfo(2, "B", -0.5, 5.0 * ly, 0.0, 0.0, region_id=10, constellation_id=100),
+            3: SystemInfo(3, "C", -0.5, 10.0 * ly, 0.0, 0.0, region_id=20, constellation_id=200),
+        }
+        # No JD edges (effective range much smaller than 5 LY).
+        # Gate path: A -- B -- C
+        gate_graph = {
+            1: [(2, False, False)],  # intra-region
+            2: [(1, False, False), (3, True, True)],  # cross-region to C
+            3: [(2, True, True)],
+        }
+        steps = find_route(
+            origin_id=1,
+            dest_id=3,
+            systems=systems,
+            graph={1: [], 2: [], 3: []},  # no JD edges
+            base_range_ly=1.0,
+            jdc_level=0,
+            fatigue_multiplier=1.0,
+            fuel_per_ly=1000,
+            mode="direct",
+            gate_graph=gate_graph,
+            gate_mode="all",
+            gate_equivalent_jumps=1.0,
+        )
+        assert len(steps) == 3
+        assert steps[0].system_id == 1
+        assert steps[-1].system_id == 3
+        assert all(s.edge_type in ("", "gate") for s in steps)

@@ -3,10 +3,11 @@ import logging
 
 from dotenv import load_dotenv
 
-from src.models.models import db
+from src.api import register_blueprints
 from src.application import Application
 from src.celery_app import celery_init_app
-from src.routes import RouteBlueprint, init_route_data
+from src.models.models import db
+from src.routes import init_route_data
 
 load_dotenv()
 
@@ -50,8 +51,7 @@ app.config.from_mapping(
 db.init_app(app)
 celery_app = celery_init_app(app)
 
-route_blueprint = RouteBlueprint("routes", __name__)
-app.register_blueprint(route_blueprint)
+register_blueprints(app)
 
 # Only init route data for the web app, not celery workers
 if os.environ.get("CELERY_WORKER") != "1":

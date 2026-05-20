@@ -42,10 +42,33 @@ ACTIVITY_WEIGHT = 30  # per recent pilot activity count (historical data)
 # POS hopping: bonus per moon (reduces cost for moon-rich systems)
 POS_MOON_BONUS = 5  # cost reduction per moon in system
 
-# Dead-end system bonus (safe mode): systems with only 1 gate are quieter
-DEAD_END_BONUS = 100  # cost reduction for single-gate systems
+# Dead-end system penalty (safe mode): systems with only 1 gate are
+# camp-prone (only one entry/exit means hostile pilots only need to watch
+# one gate). Earlier versions treated dead-ends as a bonus on the
+# assumption they were quieter — that was wrong; they're actively
+# avoided by experienced cap pilots. Cost addition for single-gate systems.
+DEAD_END_PENALTY = 100
 
-# Stargate hop cost in jump-equivalents (GARPA-style: gate ~= N jumps)
+# Multi-label search: cost added per minute of wait at a system (fatigue/cooldown
+# decay). Tuned so 60 min of waiting costs roughly the same as one 5LY jump
+# (≈ 5^1.5 ≈ 11.2), letting the search trade waits against extra jumps.
+# Higher = "quickest"  (waits expensive, search avoids JD, prefers gates).
+# Lower  = "least jumps" (waits cheap, search uses long JD with fatigue OK).
+WAIT_WEIGHT = 0.2
+
+# Per-hop overhead cost = wait_weight * HOP_OVERHEAD_FACTOR. Applied uniformly
+# to gate AND JD edges so at high wait_weight the search penalizes total hop
+# count regardless of edge type. Without this, gates always dominate at high
+# wait_weight because gate cost is fixed (~56) while JD's fatigue-time cost
+# scales with wait_weight (~1000 at wait_weight=20), and the search ends up
+# picking 35 short gates over 17 long JDs. With this overhead set at 100,
+# 1×wait_weight=20 hop ≈ 2000 cost, which dominates and pushes the search
+# toward mixed routes (long JD where possible, gates only as real shortcuts
+# that save many hops).
+HOP_OVERHEAD_FACTOR = 100
+
+# Stargate hop cost expressed in jump-equivalents (a gate hop is treated
+# as ~N JD jumps for cost-comparison purposes).
 GATE_EQUIVALENT_JUMPS = 5.0
 # Per-LY reference distance used to convert "gate equivalent jumps" into an
 # A* cost comparable to dist^exp jump costs. 5 LY is the rough middle of cap

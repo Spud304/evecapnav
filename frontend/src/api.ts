@@ -1,4 +1,4 @@
-import type { SystemSearchResult, ShipClass, RouteResult } from './types';
+import type { SystemSearchResult, ShipClass, RouteResult, MapData } from './types';
 
 export async function searchSystems(query: string): Promise<SystemSearchResult[]> {
   const resp = await fetch(`/api/systems/search?q=${encodeURIComponent(query)}`);
@@ -7,6 +7,11 @@ export async function searchSystems(query: string): Promise<SystemSearchResult[]
 
 export async function getShipClasses(): Promise<ShipClass[]> {
   const resp = await fetch('/api/ship-classes');
+  return resp.json();
+}
+
+export async function getMapData(): Promise<MapData> {
+  const resp = await fetch('/api/map/data');
   return resp.json();
 }
 
@@ -24,8 +29,10 @@ export function planRouteSSE(
     distance_exponent: number;
     danger_weight: number;
     jumps_weight: number;
-    dead_end_bonus: number;
+    activity_weight: number;
+    dead_end_penalty: number;
     pos_moon_bonus: number;
+    wait_weight: number;
     gate_mode?: 'off' | 'interregional' | 'all';
     gate_equivalent_jumps?: number;
   },
@@ -48,8 +55,10 @@ export function planRouteSSE(
     distance_exponent: String(params.distance_exponent),
     danger_weight: String(params.danger_weight),
     jumps_weight: String(params.jumps_weight),
-    dead_end_bonus: String(params.dead_end_bonus),
+    activity_weight: String(params.activity_weight),
+    dead_end_penalty: String(params.dead_end_penalty),
     pos_moon_bonus: String(params.pos_moon_bonus),
+    wait_weight: String(params.wait_weight),
     gate_mode: params.gate_mode ?? 'off',
     gate_equivalent_jumps: String(params.gate_equivalent_jumps ?? 5),
   });
@@ -91,8 +100,10 @@ export async function swapHop(params: {
   distance_exponent: number;
   danger_weight: number;
   jumps_weight: number;
-  dead_end_bonus: number;
+  activity_weight: number;
+  dead_end_penalty: number;
   pos_moon_bonus: number;
+  wait_weight: number;
 }): Promise<RouteResult> {
   const qs = new URLSearchParams({
     path: params.path.join(','),
@@ -107,8 +118,10 @@ export async function swapHop(params: {
     distance_exponent: String(params.distance_exponent),
     danger_weight: String(params.danger_weight),
     jumps_weight: String(params.jumps_weight),
-    dead_end_bonus: String(params.dead_end_bonus),
+    activity_weight: String(params.activity_weight),
+    dead_end_penalty: String(params.dead_end_penalty),
     pos_moon_bonus: String(params.pos_moon_bonus),
+    wait_weight: String(params.wait_weight),
   });
   const resp = await fetch(`/api/route/swap?${qs}`);
   return resp.json();
