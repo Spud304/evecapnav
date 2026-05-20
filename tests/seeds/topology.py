@@ -89,9 +89,9 @@ SHIP_GROUPS = [
 #   - SafeA has 1 gate (to Danger) → DEAD END pill target
 #   - SafeB has 0 gates
 #
-# Limiting dead-end status to one mid-route system keeps the dead_end_bonus
-# from collapsing the cost margin in threat-weighting tests (dead-end systems
-# get -100 cost in mode=safe, see src/pathfinder.py). The triangle
+# Limiting dead-end status to one mid-route system keeps the dead_end_penalty
+# from blowing out the cost margin in threat-weighting tests (dead-end systems
+# get +100 cost in mode=safe, see src/pathfinder.py). The triangle
 # Origin↔Danger↔Dest also gives gate-mode tests a connected 3-system network
 # so we can drive Gate-pill rendering with JDC=0 (jump range too short, gates
 # become the only option).

@@ -12,6 +12,7 @@ from __future__ import annotations
 import os
 import socket
 import threading
+from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Callable
 
@@ -37,7 +38,7 @@ class LiveServer:
 
 
 @pytest.fixture(scope="session")
-def live_server(tmp_path_factory) -> LiveServer:
+def live_server(tmp_path_factory) -> Iterator[LiveServer]:
     """Start a real Flask server on a free port with a seeded fork topology.
 
     Sets EVECAPNAV_INSTANCE_PATH so `src.tasks.get_danger_data()` and the zkill
@@ -77,7 +78,7 @@ def live_server(tmp_path_factory) -> LiveServer:
 # the unit-test in-memory app, which load_ship_classes() then reads, leaking
 # Dreadnought/etc. ship groups into our integration assertions.
 @pytest.fixture(autouse=True)
-def _cleanup() -> None:  # noqa: PT004
+def _cleanup() -> Iterator[None]:  # noqa: PT004
     yield
 
 

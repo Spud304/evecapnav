@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import RouteControls from './components/RouteControls';
 import type { RouteParams } from './components/RouteControls';
 import RouteTable from './components/RouteTable';
+import MapView from './components/MapView';
 import type { RouteResult } from './types';
 import { formatTime } from './utils/format';
 import { swapHop } from './api';
@@ -10,14 +11,15 @@ export default function App() {
   const [result, setResult] = useState<RouteResult | null>(null);
   const [error, setError] = useState('');
   const [progress, setProgress] = useState('');
+  // Tracks the system to pan/focus the map on (set when the user picks an
+  // origin or destination from the autocomplete).
+  const [focusSystemId, setFocusSystemId] = useState<number | null>(null);
   const routeParamsRef = useRef<RouteParams | null>(null);
-  const [showOptimized, setShowOptimized] = useState(false);
 
   function handleResult(r: RouteResult, params?: RouteParams) {
     setError('');
     setProgress('');
     setResult(r);
-    setShowOptimized(false);
     if (params) routeParamsRef.current = params;
   }
 
@@ -55,23 +57,11 @@ export default function App() {
     }
   }
 
-  const activeSteps = result
-    ? showOptimized && result.optimized
-      ? result.optimized.steps
-      : result.steps
-    : [];
-
-  const activeWait = result
-    ? showOptimized && result.optimized
-      ? result.optimized.total_wait_minutes
-      : result.total_wait_minutes
-    : 0;
-
-  const activeFuel = result
-    ? showOptimized && result.optimized
-      ? result.optimized.total_fuel
-      : result.total_fuel
-    : 0;
+  // Multi-label search picks waits implicitly, so we always show its
+  // primary result — there's no separate "optimized" alternative now.
+  const activeSteps = result ? result.steps : [];
+  const activeWait = result ? result.total_wait_minutes : 0;
+  const activeFuel = result ? result.total_fuel : 0;
 
   function copyAsText() {
     if (!result) return;
@@ -80,7 +70,11 @@ export default function App() {
         ? `${s.system_name} (${s.security.toFixed(1)}) ${s.sov_owner ? `[${s.sov_owner}]` : ''}`
         : `→ ${s.system_name} (${s.security.toFixed(1)}) ${s.distance_ly} LY | Wait: ${formatTime(s.wait_minutes)} | Fatigue: ${formatTime(s.fatigue_after_minutes)} ${s.sov_owner ? `[${s.sov_owner}]` : ''}`,
     );
-    lines.push(`\nTotal: ${result.total_jumps} jumps, ${activeFuel.toLocaleString()} fuel, ${formatTime(activeWait)} wait`);
+    const jdN = result.total_jumps || 0;
+    const gateN = result.total_gate_hops || 0;
+    const totalN = jdN + gateN;
+    const breakdown = gateN > 0 ? ` (${jdN} JD + ${gateN} gate)` : '';
+    lines.push(`\nTotal: ${totalN} hops${breakdown}, ${activeFuel.toLocaleString()} fuel, ${formatTime(activeWait)} wait`);
     if (result.quiet_hours) {
       lines.push(`Quietest: ${String(result.quiet_hours.start).padStart(2, '0')}:00-${String(result.quiet_hours.end).padStart(2, '0')}:00 UTC`);
     }
@@ -124,6 +118,7 @@ export default function App() {
           onResult={handleResult}
           onError={handleError}
           onProgress={handleProgress}
+          onSystemFocus={setFocusSystemId}
         />
 
         {progress && (
@@ -140,111 +135,81 @@ export default function App() {
         )}
 
         {result && result.steps.length > 0 && (
-          <>
-            <div className="grid grid-cols-[repeat(4,1fr)_auto] bg-white border border-[var(--color-line)] rounded-lg shadow-[0_1px_1px_rgba(20,25,40,0.04)] overflow-hidden mb-[18px]">
-              <div className="px-[18px] py-[14px] border-r border-[var(--color-line-soft)]">
-                <div className="text-[11px] uppercase tracking-wider text-[var(--color-muted)] mb-1">
-                  Total Jumps
-                </div>
-                <div className="text-[18px] font-semibold">{result.total_jumps}</div>
-                <div className="text-xs text-[var(--color-muted)]">
-                  avg{' '}
-                  {result.total_jumps > 0
-                    ? (
-                        activeSteps.reduce((s, x) => s + x.distance_ly, 0) /
-                        result.total_jumps
-                      ).toFixed(2)
-                    : '—'}{' '}
-                  LY
-                </div>
+          <div className="grid grid-cols-[repeat(4,1fr)_auto] bg-white border border-[var(--color-line)] rounded-lg shadow-[0_1px_1px_rgba(20,25,40,0.04)] overflow-hidden mb-[18px]">
+            <div className="px-[18px] py-[14px] border-r border-[var(--color-line-soft)]">
+              <div className="text-[11px] uppercase tracking-wider text-[var(--color-muted)] mb-1">
+                Total Hops
               </div>
-              <div className="px-[18px] py-[14px] border-r border-[var(--color-line-soft)]">
-                <div className="text-[11px] uppercase tracking-wider text-[var(--color-muted)] mb-1">
-                  Fuel
-                </div>
-                <div className="text-[18px] font-semibold">
-                  {activeFuel.toLocaleString()}
-                </div>
-                <div className="text-xs text-[var(--color-muted)]">isotopes</div>
+              <div className="text-[18px] font-semibold">
+                {(result.total_jumps || 0) + (result.total_gate_hops || 0)}
               </div>
-              <div className="px-[18px] py-[14px] border-r border-[var(--color-line-soft)]">
-                <div className="text-[11px] uppercase tracking-wider text-[var(--color-muted)] mb-1">
-                  Total Wait
-                </div>
-                <div className="text-[18px] font-semibold">{formatTime(activeWait)}</div>
-                <div className="text-xs text-[var(--color-muted)]">red + blue timers</div>
-              </div>
-              <div className="px-[18px] py-[14px] border-r border-[var(--color-line-soft)]">
-                <div className="text-[11px] uppercase tracking-wider text-[var(--color-muted)] mb-1">
-                  Quietest Window
-                </div>
-                <div className="text-[18px] font-semibold">
-                  {result.quiet_hours
-                    ? `${String(result.quiet_hours.start).padStart(2, '0')}–${String(result.quiet_hours.end).padStart(2, '0')}`
-                    : '—'}
-                </div>
-                <div className="text-xs text-[var(--color-muted)]">UTC</div>
-              </div>
-              <div className="px-[18px] py-[14px] flex flex-col gap-1.5 items-end justify-center">
-                <button
-                  onClick={copyAsText}
-                  className="text-[13px] text-[var(--color-accent)] hover:underline"
-                >
-                  Copy as text
-                </button>
-                <button
-                  onClick={openInDotlan}
-                  className="text-[13px] text-[var(--color-accent)] hover:underline"
-                >
-                  Open in Dotlan
-                </button>
+              <div className="text-xs text-[var(--color-muted)]">
+                {result.total_jumps || 0} JD
+                {result.total_gate_hops ? ` + ${result.total_gate_hops} gate` : ''}
               </div>
             </div>
-
-            <section className="card">
-              {result.optimized && (
-                <div className="flex gap-1 pt-[10px] px-[18px] border-b border-[var(--color-line-soft)]">
-                  <button
-                    onClick={() => setShowOptimized(false)}
-                    className={
-                      !showOptimized
-                        ? 'bg-white border border-[var(--color-line)] border-b-0 text-[var(--color-ink)] font-semibold relative top-px rounded-t-md px-3.5 py-[7px] text-[12px] cursor-pointer'
-                        : 'bg-transparent border border-transparent text-[var(--color-muted)] rounded-t-md px-3.5 py-[7px] text-[12px] cursor-pointer'
-                    }
-                  >
-                    Minimum Wait
-                  </button>
-                  <button
-                    onClick={() => setShowOptimized(true)}
-                    className={
-                      showOptimized
-                        ? 'bg-white border border-[var(--color-line)] border-b-0 text-[var(--color-ink)] font-semibold relative top-px rounded-t-md px-3.5 py-[7px] text-[12px] cursor-pointer'
-                        : 'bg-transparent border border-transparent text-[var(--color-muted)] rounded-t-md px-3.5 py-[7px] text-[12px] cursor-pointer'
-                    }
-                  >
-                    Optimized (+{formatTime(result.optimized.extra_wait_minutes)}/hop)
-                  </button>
-                  {showOptimized &&
-                    result.optimized.total_wait_minutes < result.total_wait_minutes && (
-                      <span className="self-center ml-2 text-[11px] text-[var(--color-good)]">
-                        Saves{' '}
-                        {formatTime(
-                          result.total_wait_minutes - result.optimized.total_wait_minutes,
-                        )}
-                      </span>
-                    )}
-                </div>
-              )}
-              <RouteTable
-                steps={activeSteps}
-                zkill={result.zkill}
-                alternatives={result.alternatives}
-                jumpDataWindow={result.jump_data_window}
-                onSwap={handleSwap}
-              />
-            </section>
-          </>
+            <div className="px-[18px] py-[14px] border-r border-[var(--color-line-soft)]">
+              <div className="text-[11px] uppercase tracking-wider text-[var(--color-muted)] mb-1">
+                Fuel
+              </div>
+              <div className="text-[18px] font-semibold">
+                {activeFuel.toLocaleString()}
+              </div>
+              <div className="text-xs text-[var(--color-muted)]">isotopes</div>
+            </div>
+            <div className="px-[18px] py-[14px] border-r border-[var(--color-line-soft)]">
+              <div className="text-[11px] uppercase tracking-wider text-[var(--color-muted)] mb-1">
+                Total Wait
+              </div>
+              <div className="text-[18px] font-semibold">{formatTime(activeWait)}</div>
+              <div className="text-xs text-[var(--color-muted)]">red + blue timers</div>
+            </div>
+            <div className="px-[18px] py-[14px] border-r border-[var(--color-line-soft)]">
+              <div className="text-[11px] uppercase tracking-wider text-[var(--color-muted)] mb-1">
+                Quietest Window
+              </div>
+              <div className="text-[18px] font-semibold">
+                {result.quiet_hours
+                  ? `${String(result.quiet_hours.start).padStart(2, '0')}–${String(result.quiet_hours.end).padStart(2, '0')}`
+                  : '—'}
+              </div>
+              <div className="text-xs text-[var(--color-muted)]">UTC</div>
+            </div>
+            <div className="px-[18px] py-[14px] flex flex-col gap-1.5 items-end justify-center">
+              <button
+                onClick={copyAsText}
+                className="text-[13px] text-[var(--color-accent)] hover:underline"
+              >
+                Copy as text
+              </button>
+              <button
+                onClick={openInDotlan}
+                className="text-[13px] text-[var(--color-accent)] hover:underline"
+              >
+                Open in Dotlan
+              </button>
+            </div>
+          </div>
         )}
+
+        {result && result.steps.length > 0 && (
+          <section className="card">
+            <RouteTable
+              steps={activeSteps}
+              zkill={result.zkill}
+              alternatives={result.alternatives}
+              jumpDataWindow={result.jump_data_window}
+              onSwap={handleSwap}
+            />
+          </section>
+        )}
+
+        <div className="mt-[18px]">
+          <MapView
+            route={activeSteps.length > 0 ? activeSteps : undefined}
+            focusSystemId={focusSystemId}
+          />
+        </div>
       </div>
     </>
   );

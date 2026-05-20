@@ -1,0 +1,30 @@
+name: ty
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  ty:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      # ty resolves third-party imports against the project's virtualenv,
+      # so the test group is needed to type-check tests/.
+      - name: Install Python deps (incl. test group)
+        run: uv sync --group test
+
+      - name: Run ty check
+        run: uvx ty check

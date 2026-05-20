@@ -1,20 +1,22 @@
+"""Celery background tasks for ESI intel polling."""
+
 import logging
 import os
 
 from celery import shared_task
 
-from src.esi import (
-    fetch_system_kills,
+from src.clients.esi_client import (
+    fetch_recent_activity,
     fetch_system_jumps,
     fetch_system_jumps_from_api,
-    fetch_recent_activity,
+    fetch_system_kills,
 )
-from src.cache import (
-    save_esi_kills,
-    save_esi_jumps,
-    save_esi_activity,
+from src.stores.intel_cache_store import (
     load_danger_data,
     mark_esi_updated,
+    save_esi_activity,
+    save_esi_jumps,
+    save_esi_kills,
 )
 
 logger = logging.getLogger(__name__)
@@ -24,7 +26,10 @@ def _instance_path() -> str:
     override = os.environ.get("EVECAPNAV_INSTANCE_PATH")
     if override:
         return override
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "instance")
+    # We're under src/tasks/intel_tasks.py — go up two dirs to reach src/.
+    return os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "instance"
+    )
 
 
 def get_danger_data() -> dict[int, dict]:
@@ -50,7 +55,6 @@ def poll_system_stats():
     if jumps:
         save_esi_jumps(instance, jumps)
 
-    # Fetch recent pilot activity from historical data if available
     if source == "fastapi":
         api_url = os.environ.get("JUMP_API_URL", "http://localhost:8001")
         activity = fetch_recent_activity(api_url)

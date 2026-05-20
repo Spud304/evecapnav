@@ -61,6 +61,45 @@ def _create_static_tables() -> None:
                 """
             )
         )
+        # MapService.get_map_data queries RegionName for region label lookups.
+        conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS RegionName (
+                    parentTypeId INTEGER,
+                    parentTypeId2 INTEGER,
+                    parentTypeCategory TEXT,
+                    en TEXT,
+                    PRIMARY KEY (parentTypeId, parentTypeId2, parentTypeCategory)
+                )
+                """
+            )
+        )
+        # RouteService._startup_esi_fetch queries FactionName when fetching
+        # sovereignty. Tests mark the ESI cache fresh so this branch shouldn't
+        # fire, but create the table anyway so the schema mirrors prod.
+        conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS FactionName (
+                    parentTypeId INTEGER,
+                    parentTypeId2 INTEGER,
+                    parentTypeCategory TEXT,
+                    en TEXT,
+                    PRIMARY KEY (parentTypeId, parentTypeId2, parentTypeCategory)
+                )
+                """
+            )
+        )
+        # Seed a single region row so the seeded systems (all on regionID=1) get
+        # a name in the map response.
+        conn.execute(
+            text(
+                "INSERT OR REPLACE INTO RegionName "
+                "(parentTypeId, parentTypeId2, parentTypeCategory, en) "
+                "VALUES (1, 0, '', 'TestRegion')"
+            )
+        )
         conn.commit()
 
 
