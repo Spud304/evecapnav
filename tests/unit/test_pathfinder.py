@@ -514,9 +514,7 @@ class TestBicriterionRouting:
         systems = {
             1: SystemInfo(1, "A", -0.5, 0.0, 0.0, 0.0, 1),
             2: SystemInfo(2, "B", -0.5, b_dist_ly * ly, 0.0, 0.0, 1),
-            3: SystemInfo(
-                3, "C", -0.5, (b_dist_ly + c_dist_ly) * ly, 0.0, 0.0, 1
-            ),
+            3: SystemInfo(3, "C", -0.5, (b_dist_ly + c_dist_ly) * ly, 0.0, 0.0, 1),
         }
         graph = {
             1: [(2, b_dist_ly)],
@@ -670,9 +668,15 @@ class TestBicriterionRouting:
         the legacy A* path."""
         ly = self.LY
         systems = {
-            1: SystemInfo(1, "A", -0.5, 0.0, 0.0, 0.0, region_id=10, constellation_id=100),
-            2: SystemInfo(2, "B", -0.5, 5.0 * ly, 0.0, 0.0, region_id=10, constellation_id=100),
-            3: SystemInfo(3, "C", -0.5, 10.0 * ly, 0.0, 0.0, region_id=20, constellation_id=200),
+            1: SystemInfo(
+                1, "A", -0.5, 0.0, 0.0, 0.0, region_id=10, constellation_id=100
+            ),
+            2: SystemInfo(
+                2, "B", -0.5, 5.0 * ly, 0.0, 0.0, region_id=10, constellation_id=100
+            ),
+            3: SystemInfo(
+                3, "C", -0.5, 10.0 * ly, 0.0, 0.0, region_id=20, constellation_id=200
+            ),
         }
         # No JD edges (effective range much smaller than 5 LY).
         # Gate path: A -- B -- C

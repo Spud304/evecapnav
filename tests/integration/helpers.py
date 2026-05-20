@@ -26,9 +26,7 @@ def plan_route(page: Page) -> None:
     """Click the Plan Route button and wait for the result table to render."""
     page.get_by_role("button", name="Plan Route").click()
     # Result is rendered once the summary card with "Total Hops" shows up.
-    page.get_by_text("Total Hops", exact=True).wait_for(
-        state="visible", timeout=10_000
-    )
+    page.get_by_text("Total Hops", exact=True).wait_for(state="visible", timeout=10_000)
 
 
 def route_system_names(page: Page) -> list[str]:

@@ -117,8 +117,10 @@ class RouteService:
         `fcntl` is Unix-only; on Windows we skip the lock (tests + dev only).
         """
         from typing import Any
+
         try:
             import fcntl as _fcntl_mod  # type: ignore[import-not-found]
+
             fcntl: Any = _fcntl_mod
         except ImportError:
             fcntl = None

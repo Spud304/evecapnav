@@ -74,7 +74,8 @@ def find_route(
     """
     effective_range = base_range_ly * (1 + 0.20 * jdc_level)
     logger.info(
-        "=" * 70
+        "="
+        * 70
         + "\n[find_route] origin=%d dest=%d ship_range=%.2fLY jdc=%d eff=%.2fLY "
         "ff_mult=%.2f mode=%s wait_weight=%.3f gates=%s",
         origin_id,
@@ -120,7 +121,9 @@ def find_route(
         for sid in bfs_visited_set:
             sinfo = systems.get(sid)
             if sinfo:
-                region_counts[sinfo.region_id] = region_counts.get(sinfo.region_id, 0) + 1
+                region_counts[sinfo.region_id] = (
+                    region_counts.get(sinfo.region_id, 0) + 1
+                )
         logger.warning(
             "[find_route] BFS reachable cluster by region: %s",
             sorted(region_counts.items(), key=lambda kv: -kv[1]),
@@ -148,9 +151,7 @@ def find_route(
             # If this is <= effective_range, the graph build is missing
             # edges that should exist (real bug). If it's > effective_range,
             # the BFS cluster is genuinely walled off in capnav's coords.
-            _log_cross_cluster_gap(
-                bfs_visited_set, systems, effective_range, dest_id
-            )
+            _log_cross_cluster_gap(bfs_visited_set, systems, effective_range, dest_id)
             # Membership + edge-presence check against a known-good Dotlan
             # lowsec-bridging route, to spot if load_systems filtered out
             # any of those bridge systems.

@@ -78,7 +78,9 @@ def test_initial_fatigue_carries_over_to_first_hop(
     set_initial_fatigue(page, 60)
 
     seen_urls: list[str] = []
-    page.on("request", lambda r: seen_urls.append(r.url) if "/api/route" in r.url else None)
+    page.on(
+        "request", lambda r: seen_urls.append(r.url) if "/api/route" in r.url else None
+    )
 
     plan_route(page)
 

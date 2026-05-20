@@ -60,12 +60,7 @@ def load_celestials() -> dict[int, list[Celestial]]:
         )
 
     for b in db.session.query(MapAsteroidBelt).all():
-        if (
-            b.solarSystemID is not None
-            and b.positionX
-            and b.positionY
-            and b.positionZ
-        ):
+        if b.solarSystemID is not None and b.positionX and b.positionY and b.positionZ:
             _ensure(b.solarSystemID).append(
                 Celestial(
                     "Belt", float(b.positionX), float(b.positionY), float(b.positionZ)

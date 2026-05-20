@@ -329,9 +329,10 @@ def _reconstruct_route(
         # Look ahead: accumulate consecutive wait pseudo-edges at the same system.
         j = i + 1
         wait_after = 0.0
-        while j < len(chain) and (
-            chain[j].jump_type & (JT_FATIGUE_WAIT | JT_COOLDOWN_WAIT)
-        ) != 0:
+        while (
+            j < len(chain)
+            and (chain[j].jump_type & (JT_FATIGUE_WAIT | JT_COOLDOWN_WAIT)) != 0
+        ):
             delta_min = (chain[j].time_seconds - chain[j - 1].time_seconds) / 60.0
             wait_after += delta_min
             j += 1
@@ -623,9 +624,7 @@ def _find_route_multi_label(
                 min(lbl.cost for lbl in dest_labels),
             )
         else:
-            logger.warning(
-                "[ML] dest_id %d was NEVER reached by the search.", dest_id
-            )
+            logger.warning("[ML] dest_id %d was NEVER reached by the search.", dest_id)
         return None
     logger.info(
         "[ML] FOUND route cost=%.2f pops=%d pushed=%d max_heap=%d "

@@ -86,7 +86,9 @@ def _log_dotlan_chain_membership(
     for name in chain_names:
         s = name_to_sys.get(name)
         if s is None:
-            logger.warning("  %-9s: NOT IN SYSTEMS DICT (filtered out by load_systems)", name)
+            logger.warning(
+                "  %-9s: NOT IN SYSTEMS DICT (filtered out by load_systems)", name
+            )
             continue
         in_origin = s.system_id in bfs_origin_set
         in_dest = s.system_id in dest_bfs_set
@@ -119,9 +121,10 @@ def _log_dotlan_chain_membership(
             ((d) for nb_id, d in graph.get(a.system_id, []) if nb_id == b.system_id),
             None,
         )
-        raw_ly = math.sqrt(
-            (a.x - b.x) ** 2 + (a.y - b.y) ** 2 + (a.z - b.z) ** 2
-        ) / METERS_PER_LY
+        raw_ly = (
+            math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2 + (a.z - b.z) ** 2)
+            / METERS_PER_LY
+        )
         if edge is None:
             logger.warning(
                 "  %s -> %s: MISSING from graph (raw=%.3f LY)",
@@ -130,7 +133,11 @@ def _log_dotlan_chain_membership(
                 raw_ly,
             )
         else:
-            note = "" if edge <= effective_range else f" EXCEEDS eff_range {effective_range}"
+            note = (
+                ""
+                if edge <= effective_range
+                else f" EXCEEDS eff_range {effective_range}"
+            )
             logger.warning(
                 "  %s -> %s: graph_d=%.3f LY%s",
                 a_name,
