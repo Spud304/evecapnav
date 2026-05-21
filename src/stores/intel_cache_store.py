@@ -31,11 +31,33 @@ def _migrate_esi_activity(conn: sqlite3.Connection) -> None:
         logger.info("Migrated esi_activity: dropped old schema for recreate")
 
 
+def _migrate_safe_spots(conn: sqlite3.Connection) -> None:
+    """Clear safe_spots if it contains stale 'Belt' labels.
+
+    Older precomputes used a single 'Belt' label for every asteroid belt;
+    we now generate 'Belt II-1' / 'Belt VII-3' style labels (matching the
+    in-game and dotlan format). If any cached row still has the bare label
+    the whole table is wiped so init_route_data() recomputes on next start.
+    """
+    try:
+        row = conn.execute(
+            "SELECT 1 FROM safe_spots WHERE warp_between LIKE '% Belt %' "
+            "OR warp_between LIKE 'Belt %' OR warp_between LIKE '% Belt' "
+            "OR nearest_label = 'Belt' LIMIT 1"
+        ).fetchone()
+    except sqlite3.OperationalError:
+        return  # table doesn't exist yet — nothing to migrate
+    if row:
+        conn.execute("DELETE FROM safe_spots")
+        logger.info("Migrated safe_spots: dropped stale 'Belt' labels for recompute")
+
+
 def _init_cache_db(path: str) -> None:
     if path in _initialized_paths:
         return
     conn = sqlite3.connect(path)
     _migrate_esi_activity(conn)
+    _migrate_safe_spots(conn)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS safe_spots (
             system_id INTEGER PRIMARY KEY,

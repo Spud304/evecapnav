@@ -36,8 +36,27 @@ function safeColor(au: number) {
 }
 
 const TH =
-  'text-left bg-[var(--color-surface-2)] border-b border-[var(--color-line)] text-[var(--color-muted)] font-semibold text-[11px] tracking-wider uppercase py-[9px] px-3';
+  'text-left bg-[var(--color-surface-2)] border-b border-[var(--color-line)] text-[var(--color-muted)] font-semibold text-[11px] tracking-wider uppercase py-[9px] px-3 whitespace-nowrap';
 const TD = 'border-b border-[var(--color-line-soft)] py-[11px] px-3 align-middle';
+
+/** Small ⓘ tooltip icon next to a column header.
+ *
+ * Uses the native `title` attribute on a dedicated <span> so the hover
+ * trigger is just the icon rather than the whole th (which would fire
+ * the tooltip whenever the user hovered anywhere in the column header).
+ */
+function HeaderInfo({ text }: { text: string }) {
+  return (
+    <span
+      className="ml-1 cursor-help align-middle normal-case tracking-normal text-[10px] opacity-70 hover:opacity-100"
+      title={text}
+      data-testid="header-info"
+      aria-label={text}
+    >
+      ⓘ
+    </span>
+  );
+}
 
 export default function RouteTable({
   steps,
@@ -59,16 +78,48 @@ export default function RouteTable({
           <thead>
             <tr>
               <th className={`${TH} w-[42px]`}>#</th>
-              <th className={TH}>System</th>
-              <th className={`${TH} w-[72px]`}>Sec</th>
-              <th className={`${TH} text-right w-[60px]`}>LY</th>
-              <th className={`${TH} text-right w-[68px]`}>Wait</th>
-              <th className={`${TH} text-right w-[80px]`}>Fatigue</th>
-              <th className={`${TH} text-right w-[64px]`}>Kills/h</th>
-              <th className={`${TH} text-right w-[200px]`}>Hour-of-day (UTC)</th>
-              {showMoons && <th className={`${TH} text-right w-[60px]`}>Moons</th>}
-              <th className={`${TH} w-[110px]`}>Threat</th>
-              <th className={`${TH} text-right w-[80px]`}>Safe AU</th>
+              <th className={TH}>
+                System
+                <HeaderInfo text="System name. Color-band pill on the right of the row shows alliance / faction sov holder; the colored stripe at the row's left edge encodes the same alliance." />
+              </th>
+              <th className={`${TH} w-[72px]`}>
+                Sec
+                <HeaderInfo text="True security status (raw float — not the rounded display value). HS = hi-sec, LS = low-sec, NS = null-sec. Capital ships can't gate-jump into HS." />
+              </th>
+              <th className={`${TH} text-right w-[60px]`}>
+                LY
+                <HeaderInfo text="Light-years jumped to reach this system from the previous one. Empty for the origin and gate hops (gate distance is informational only)." />
+              </th>
+              <th className={`${TH} text-right w-[68px]`}>
+                Wait
+                <HeaderInfo text="Time you wait at this system before the next hop. The two-tone bar splits the wait into red-timer cooldown (mandatory between JDs) and blue-timer fatigue decay (optional, only worth taking if it shortens the next jump's cooldown)." />
+              </th>
+              <th className={`${TH} text-right w-[80px]`}>
+                Fatigue
+                <HeaderInfo text="Jump fatigue accumulated AFTER this hop, including any wait-decay you took. Hard caps at 300 minutes. Decays 1 minute per real minute." />
+              </th>
+              <th className={`${TH} text-right w-[64px]`}>
+                Kills/h
+                <HeaderInfo text="Ship kills in this system over the most recent hour, from ESI. Updates hourly. Rows tint amber at 4+ and red at 11+ to flag active hunting." />
+              </th>
+              <th className={`${TH} text-right w-[220px]`}>
+                Hour-of-day · weekly avg (UTC)
+                <HeaderInfo text="Per-hour jump traffic profile, AVERAGED OVER THE PAST 7 DAYS. Each bar = one UTC hour, height = mean ship_jumps that hour. Peak / Quiet labels under the bars show the busiest and quietest hour; the amber outlined bar is the current UTC hour." />
+              </th>
+              {showMoons && (
+                <th className={`${TH} text-right w-[60px]`}>
+                  Moons
+                  <HeaderInfo text="Moon count in this system. Only shown in POS-Hopping mode — useful for picking moon-rich systems for safe spots and POS bookmarks." />
+                </th>
+              )}
+              <th className={`${TH} w-[110px]`}>
+                Threat
+                <HeaderInfo text="Recent PVP activity from zKillboard. Active PVPers is the rolling count of distinct attackers; Gang % is the fraction of recorded kills with 2+ attackers (gang vs solo). Click the cell for the full breakdown including 24-hour activity histogram." />
+              </th>
+              <th className={`${TH} text-right w-[170px]`}>
+                Safe AU
+                <HeaderInfo text="Distance in AU between the safest pair of celestials in this system — bigger = better mid-warp safe spot. The 'warp X-Y' line names the two planets to bookmark, and 'near Z' is the nearest probe-able reference." />
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -153,6 +204,9 @@ export default function RouteTable({
                     <td
                       className={`${TD} text-right tabular-nums`}
                       title={(() => {
+                        if (step.edge_type === 'gate') {
+                          return `Gate travel + any pre-jump fatigue decay (gates have no red-timer cooldown)`;
+                        }
                         const cd = step.wait_cooldown_minutes ?? 0;
                         const dc = step.wait_decay_minutes ?? 0;
                         if (cd <= 0 && dc <= 0) return '';
@@ -161,6 +215,12 @@ export default function RouteTable({
                     >
                       {step.wait_minutes > 0 ? formatTime(step.wait_minutes) : '—'}
                       {(() => {
+                        // Two-tone bar is meaningful only for JD hops, which
+                        // are the only edges that produce a red-timer cooldown.
+                        // Gate hops mix travel-time + decay waiting and have no
+                        // red timer at all — rendering a half-red bar for them
+                        // is visually misleading.
+                        if (step.edge_type !== 'jump') return null;
                         const cd = step.wait_cooldown_minutes ?? 0;
                         const dc = step.wait_decay_minutes ?? 0;
                         const total = cd + dc;
@@ -228,7 +288,7 @@ export default function RouteTable({
                           ) : null}
                           {z.gang_ratio && z.gang_ratio !== '0%' ? (
                             <span className="block text-[var(--color-muted)]">
-                              Gang: {z.gang_ratio}%
+                              Gang: {z.gang_ratio}
                             </span>
                           ) : null}
                         </>
@@ -237,7 +297,7 @@ export default function RouteTable({
                       )}
                     </td>
                     <td
-                      className={`${TD} text-right`}
+                      className={`${TD} text-right max-w-[170px]`}
                       title={[
                         step.safe_spot_warp ? `warp ${step.safe_spot_warp}` : '',
                         step.safe_spot_nearest ? `near ${step.safe_spot_nearest}` : '',
@@ -251,6 +311,22 @@ export default function RouteTable({
                       >
                         {step.safe_spot_au.toFixed(1)}
                       </span>
+                      {step.safe_spot_warp && (
+                        <span
+                          className="block text-[10.5px] text-[var(--color-muted)] font-normal truncate"
+                          title={`warp ${step.safe_spot_warp}`}
+                        >
+                          warp {step.safe_spot_warp}
+                        </span>
+                      )}
+                      {step.safe_spot_nearest && (
+                        <span
+                          className="block text-[10.5px] text-[var(--color-muted)] font-normal truncate"
+                          title={`near ${step.safe_spot_nearest}`}
+                        >
+                          near {step.safe_spot_nearest}
+                        </span>
+                      )}
                     </td>
                   </tr>
                   {isExpanded && alts.length > 0 && (

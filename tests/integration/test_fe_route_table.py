@@ -86,27 +86,25 @@ def test_sec_band_pill_renders_LS_HS_from_mock(
     assert "HS" in bands
 
 
-def test_safe_au_subtext_moved_to_title_attribute(
+def test_safe_au_subtext_renders_warp_and_nearest(
     page: Page, base_url: str, reseed
 ) -> None:
-    """The 'warp X-Y' / 'near Z' subtitles used to render as muted spans below
-    the AU number. They're now collapsed into a `title` tooltip on the cell
-    so only the AU number takes pixel space."""
+    """The 'warp X-Y' / 'near Z' subtitles render as muted spans below the AU
+    number so a pilot can see HOW to make the safe spot without hovering.
+    A duplicate `title` tooltip on the cell makes the info screen-reader-
+    friendly too."""
     reseed("empty")
     plan_origin_to_dest(page, base_url)
-    # Find the Safe AU cell on the origin row. It's the LAST td on each row
-    # (Threat column is second-to-last; Safe AU is the rightmost).
     origin_row = route_data_rows(page).nth(0)
     safe_cell = origin_row.locator("td").last
-    title = safe_cell.get_attribute("title") or ""
-    # The integration topology seeds two planets per system, so there should
-    # be a non-empty `warp X-Y` string in the tooltip. Strict equality isn't
-    # safe — just check the prefix.
-    assert "warp" in title or "near" in title, title
-    # And the formerly-rendered subtitle spans should NOT be in the DOM.
+    # Visible subtitle spans must be present (integration topology seeds two
+    # planets per system so the `warp X-Y` text always populates).
     from playwright.sync_api import expect
 
-    expect(safe_cell.locator(".text-\\[10\\.5px\\]")).to_have_count(0)
+    expect(safe_cell.locator(".text-\\[10\\.5px\\]").first).to_be_visible()
+    # And the cell's `title` attribute still carries the same info.
+    title = safe_cell.get_attribute("title") or ""
+    assert "warp" in title or "near" in title, title
 
 
 def test_moons_column_hidden_in_safe_mode(
@@ -119,6 +117,44 @@ def test_moons_column_hidden_in_safe_mode(
     reseed("empty")
     plan_origin_to_dest(page, base_url)
     expect(page.get_by_role("columnheader", name="Moons")).to_have_count(0)
+
+
+def test_column_headers_render_info_icons_with_titles(
+    page: Page, base_url: str, reseed
+) -> None:
+    """Every column header should carry a hoverable ⓘ icon whose `title`
+    attribute explains the column. The Hour-of-day column header must
+    explicitly call out that the sparkline is a weekly average."""
+    from playwright.sync_api import expect
+
+    reseed("empty")
+    plan_origin_to_dest(page, base_url)
+    icons = page.get_by_test_id("header-info")
+    # At least 9 columns get an info icon (System, Sec, LY, Wait, Fatigue,
+    # Kills/h, Hour-of-day, Threat, Safe AU). Moons is only present in POS
+    # mode so this lower bound is mode-agnostic.
+    assert icons.count() >= 9
+
+    # Hour-of-day's tooltip must explicitly mention the weekly averaging
+    # window — that's the bit users were missing from the label alone.
+    hour_header = page.get_by_role("columnheader", name="Hour-of-day", exact=False)
+    expect(hour_header).to_be_visible()
+    hour_info = hour_header.get_by_test_id("header-info")
+    title = hour_info.get_attribute("title") or ""
+    assert "7" in title or "week" in title.lower(), title
+
+
+def test_hour_of_day_column_label_says_weekly_avg(
+    page: Page, base_url: str, reseed
+) -> None:
+    """The visible column header itself (not just the tooltip) should say
+    `weekly avg` so users don't have to hover to learn the window."""
+    from playwright.sync_api import expect
+
+    reseed("empty")
+    plan_origin_to_dest(page, base_url)
+    header = page.get_by_role("columnheader", name="Hour-of-day", exact=False)
+    expect(header).to_contain_text("weekly avg")
 
 
 def test_wait_cell_renders_two_tone_bar_when_breakdown_present(
@@ -165,6 +201,34 @@ def test_wait_cell_no_bar_when_breakdown_zero(
     from tests.integration.helpers import mock_route_response, two_hop_result
 
     mock_route_response(page, result=two_hop_result())
+    plan_origin_to_dest(page, base_url)
+    expect(page.get_by_test_id("wait-bar")).to_have_count(0)
+
+
+def test_wait_cell_no_bar_on_gate_hops(page: Page, base_url: str) -> None:
+    """Gate hops have travel-time + pre-jump decay rolled together but no
+    red-timer cooldown — the two-tone bar would be misleading. Suppress it
+    on gate edges even if wait_decay_minutes is nonzero."""
+    from tests.integration.helpers import mock_route_response, step_dict, two_hop_result
+
+    result = two_hop_result()
+    result["steps"] = [
+        step_dict(system_id=1, system_name="Origin", security=-0.5),
+        step_dict(
+            system_id=2,
+            system_name="GateDest",
+            security=-0.5,
+            distance_ly=0,
+            wait_minutes=31,
+            # The search emits decay for the pre-JD wait at this system, but
+            # because the inbound edge was a gate the row shouldn't show the
+            # red/blue bar at all.
+            wait_cooldown_minutes=0,
+            wait_decay_minutes=31,
+            edge_type="gate",
+        ),
+    ]
+    mock_route_response(page, result=result)
     plan_origin_to_dest(page, base_url)
     expect(page.get_by_test_id("wait-bar")).to_have_count(0)
 

@@ -22,8 +22,14 @@ const DEFAULT_WEIGHTS = {
 // pre-multi-label behavior (small fatigue penalty).
 const WAIT_WEIGHT_MIN = 0.05;
 const WAIT_WEIGHT_MAX = 20;
-const sliderToWaitWeight = (s: number): number =>
-  WAIT_WEIGHT_MIN + (s / 100) * (WAIT_WEIGHT_MAX - WAIT_WEIGHT_MIN);
+const sliderToWaitWeight = (s: number): number => {
+  // Round to 2 dp at the source so the override-input display and the
+  // slider label stay clean (otherwise an IEEE float like 1.4465000000000001
+  // leaks into the number input). 2 dp gives 1996 distinct slider values
+  // across [0.05, 20], which is finer than the cost model's sensitivity.
+  const raw = WAIT_WEIGHT_MIN + (s / 100) * (WAIT_WEIGHT_MAX - WAIT_WEIGHT_MIN);
+  return Math.round(raw * 100) / 100;
+};
 const waitWeightToSlider = (w: number): number => {
   const raw = ((w - WAIT_WEIGHT_MIN) / (WAIT_WEIGHT_MAX - WAIT_WEIGHT_MIN)) * 100;
   return Math.max(0, Math.min(100, raw));

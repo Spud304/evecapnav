@@ -71,7 +71,7 @@ export default function ThreatModal({
               <div className="text-[var(--color-muted)] text-[11px] uppercase tracking-wider">
                 Group Kills
               </div>
-              <div className="text-xl font-semibold">{stats.gang_ratio || '0'}%</div>
+              <div className="text-xl font-semibold">{stats.gang_ratio || '0%'}</div>
             </div>
           </div>
 
