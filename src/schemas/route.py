@@ -6,7 +6,7 @@ not an algorithm internal. The pathfinder *produces* a list of these
 but doesn't use them in its search state (that's `Vertex`).
 """
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 
 
 @dataclass
@@ -27,6 +27,13 @@ class RouteStep:
     gate_count: int
     sov_owner: str
     edge_type: str = "jump"  # "jump" for jump-drive hops, "gate" for stargate hops
+    # Per-hour jump traffic for this system, weekly avg, UTC index 0=00:00.
+    hourly_jumps: list[float] = field(default_factory=list)
+    # Breakdown of wait_minutes into mandatory cooldown (red timer) vs
+    # optional fatigue-decay (blue timer). cooldown + decay == wait_minutes.
+    # Frontend renders these as a two-tone bar inside the Wait cell.
+    wait_cooldown_minutes: float = 0.0
+    wait_decay_minutes: float = 0.0
 
     def to_dict(self) -> dict:
         return asdict(self)

@@ -1,4 +1,4 @@
-import type { SystemSearchResult, ShipClass, RouteResult, MapData } from './types';
+import type { SystemSearchResult, ShipClass, CapShip, RouteResult, MapData } from './types';
 
 export async function searchSystems(query: string): Promise<SystemSearchResult[]> {
   const resp = await fetch(`/api/systems/search?q=${encodeURIComponent(query)}`);
@@ -7,6 +7,11 @@ export async function searchSystems(query: string): Promise<SystemSearchResult[]
 
 export async function getShipClasses(): Promise<ShipClass[]> {
   const resp = await fetch('/api/ship-classes');
+  return resp.json();
+}
+
+export async function getCapShips(): Promise<CapShip[]> {
+  const resp = await fetch('/api/cap-ships');
   return resp.json();
 }
 

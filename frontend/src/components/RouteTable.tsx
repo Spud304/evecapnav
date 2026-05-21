@@ -1,14 +1,32 @@
 import React, { useState } from 'react';
 import type { RouteStep, ZkillSystemStats, AlternativeSystem } from '../types';
-import { formatTime, secColor } from '../utils/format';
+import { formatTime, secBand, secColor } from '../utils/format';
+import { getSovColor } from '../utils/sovColors';
 import ThreatModal from './ThreatModal';
+import Sparkline from './Sparkline';
 
 interface Props {
   steps: RouteStep[];
   zkill?: Record<number, ZkillSystemStats>;
   alternatives?: Record<string, AlternativeSystem[]>;
-  jumpDataWindow?: '1h' | '24h';
+  /** Routing mode — drives whether the Moons column is shown. */
+  mode?: 'safe' | 'direct' | 'pos';
   onSwap?: (hopIndex: number, altSystemId: number) => void;
+}
+
+/** Pill background + text for the sec-band marker.
+ *
+ * HS gets a hard-red warning (capital ships can't gate-jump into HS, so any
+ * HS step on a cap route is almost always a bug or a mis-set parameter).
+ */
+function secBandStyle(band: 'HS' | 'LS' | 'NS'): React.CSSProperties {
+  if (band === 'HS') {
+    return { background: 'rgba(248,81,73,0.20)', color: '#ff8a82', borderColor: 'rgba(248,81,73,0.40)' };
+  }
+  if (band === 'LS') {
+    return { background: 'rgba(210,153,34,0.18)', color: '#d4a64a', borderColor: 'rgba(210,153,34,0.35)' };
+  }
+  return { background: 'rgba(63,185,80,0.15)', color: '#56d364', borderColor: 'rgba(63,185,80,0.35)' };
 }
 
 function safeColor(au: number) {
@@ -17,15 +35,22 @@ function safeColor(au: number) {
   return 'var(--color-bad)';
 }
 
+const TH =
+  'text-left bg-[var(--color-surface-2)] border-b border-[var(--color-line)] text-[var(--color-muted)] font-semibold text-[11px] tracking-wider uppercase py-[9px] px-3';
+const TD = 'border-b border-[var(--color-line-soft)] py-[11px] px-3 align-middle';
+
 export default function RouteTable({
   steps,
   zkill,
   alternatives,
-  jumpDataWindow,
+  mode = 'safe',
   onSwap,
 }: Props) {
   const [selectedStep, setSelectedStep] = useState<RouteStep | null>(null);
   const [expandedHop, setExpandedHop] = useState<number | null>(null);
+
+  const showMoons = mode === 'pos';
+  const totalCols = showMoons ? 11 : 10;
 
   return (
     <>
@@ -33,46 +58,30 @@ export default function RouteTable({
         <table className="w-full border-collapse text-[12px]">
           <thead>
             <tr>
-              <th className="text-left bg-[#fafbfc] border-b border-[var(--color-line)] text-[var(--color-muted)] font-semibold text-[11px] tracking-wider uppercase py-[9px] px-3 w-[42px]">
-                #
-              </th>
-              <th className="text-left bg-[#fafbfc] border-b border-[var(--color-line)] text-[var(--color-muted)] font-semibold text-[11px] tracking-wider uppercase py-[9px] px-3">
-                System
-              </th>
-              <th className="text-left bg-[#fafbfc] border-b border-[var(--color-line)] text-[var(--color-muted)] font-semibold text-[11px] tracking-wider uppercase py-[9px] px-3 w-[48px]">
-                Sec
-              </th>
-              <th className="text-right bg-[#fafbfc] border-b border-[var(--color-line)] text-[var(--color-muted)] font-semibold text-[11px] tracking-wider uppercase py-[9px] px-3 w-[60px]">
-                LY
-              </th>
-              <th className="text-right bg-[#fafbfc] border-b border-[var(--color-line)] text-[var(--color-muted)] font-semibold text-[11px] tracking-wider uppercase py-[9px] px-3 w-[68px]">
-                Wait
-              </th>
-              <th className="text-right bg-[#fafbfc] border-b border-[var(--color-line)] text-[var(--color-muted)] font-semibold text-[11px] tracking-wider uppercase py-[9px] px-3 w-[80px]">
-                Fatigue
-              </th>
-              <th className="text-right bg-[#fafbfc] border-b border-[var(--color-line)] text-[var(--color-muted)] font-semibold text-[11px] tracking-wider uppercase py-[9px] px-3 w-[64px]">
-                Kills/h
-              </th>
-              <th className="text-right bg-[#fafbfc] border-b border-[var(--color-line)] text-[var(--color-muted)] font-semibold text-[11px] tracking-wider uppercase py-[9px] px-3 w-[72px]">
-                Jumps/{jumpDataWindow === '24h' ? '24h' : 'h'}
-              </th>
-              <th className="text-right bg-[#fafbfc] border-b border-[var(--color-line)] text-[var(--color-muted)] font-semibold text-[11px] tracking-wider uppercase py-[9px] px-3 w-[60px]">
-                Moons
-              </th>
-              <th className="text-left bg-[#fafbfc] border-b border-[var(--color-line)] text-[var(--color-muted)] font-semibold text-[11px] tracking-wider uppercase py-[9px] px-3 w-[110px]">
-                Threat
-              </th>
-              <th className="text-right bg-[#fafbfc] border-b border-[var(--color-line)] text-[var(--color-muted)] font-semibold text-[11px] tracking-wider uppercase py-[9px] px-3 w-[80px]">
-                Safe AU
-              </th>
+              <th className={`${TH} w-[42px]`}>#</th>
+              <th className={TH}>System</th>
+              <th className={`${TH} w-[72px]`}>Sec</th>
+              <th className={`${TH} text-right w-[60px]`}>LY</th>
+              <th className={`${TH} text-right w-[68px]`}>Wait</th>
+              <th className={`${TH} text-right w-[80px]`}>Fatigue</th>
+              <th className={`${TH} text-right w-[64px]`}>Kills/h</th>
+              <th className={`${TH} text-right w-[200px]`}>Hour-of-day (UTC)</th>
+              {showMoons && <th className={`${TH} text-right w-[60px]`}>Moons</th>}
+              <th className={`${TH} w-[110px]`}>Threat</th>
+              <th className={`${TH} text-right w-[80px]`}>Safe AU</th>
             </tr>
           </thead>
           <tbody>
             {steps.map((step, i) => {
+              let threat: 'high' | 'mid' | 'none' = 'none';
               let rowBg = '';
-              if (step.kills_per_hour > 10) rowBg = 'bg-red-50';
-              else if (step.kills_per_hour > 3) rowBg = 'bg-amber-50';
+              if (step.kills_per_hour > 10) {
+                threat = 'high';
+                rowBg = 'bg-[rgba(248,81,73,0.10)]';
+              } else if (step.kills_per_hour > 3) {
+                threat = 'mid';
+                rowBg = 'bg-[rgba(210,153,34,0.10)]';
+              }
 
               const z = zkill?.[step.system_id];
               const alts = alternatives?.[String(step.system_id)] || [];
@@ -80,8 +89,19 @@ export default function RouteTable({
 
               return (
                 <React.Fragment key={i}>
-                  <tr className={`${rowBg} hover:bg-[#f9fafc]`}>
-                    <td className="border-b border-[var(--color-line-soft)] py-[11px] px-3 text-right align-middle font-mono">
+                  <tr
+                    className={`${rowBg} hover:bg-[var(--color-surface-2)]`}
+                    data-row-threat={threat}
+                    data-sov-color={getSovColor(step.sov_owner) ?? ''}
+                    style={
+                      getSovColor(step.sov_owner)
+                        ? {
+                            boxShadow: `inset 4px 0 0 ${getSovColor(step.sov_owner)}`,
+                          }
+                        : undefined
+                    }
+                  >
+                    <td className={`${TD} text-right font-mono`}>
                       {i}
                       {i > 0 && alts.length > 0 && (
                         <button
@@ -93,11 +113,11 @@ export default function RouteTable({
                         </button>
                       )}
                     </td>
-                    <td className="border-b border-[var(--color-line-soft)] py-[11px] px-3 align-middle">
+                    <td className={TD}>
                       <div className="font-semibold text-[var(--color-ink)]">
                         {step.system_name}
                         {step.edge_type === 'gate' && (
-                          <span className="pill ml-1.5 bg-[var(--color-accent)] text-white">
+                          <span className="pill ml-1.5" style={{ background: 'rgba(88,166,255,0.18)', borderColor: 'rgba(88,166,255,0.40)', color: '#79b8ff' }}>
                             Gate
                           </span>
                         )}
@@ -111,23 +131,70 @@ export default function RouteTable({
                         </div>
                       )}
                     </td>
-                    <td
-                      className="border-b border-[var(--color-line-soft)] py-[11px] px-3 align-middle font-semibold"
-                      style={{ color: secColor(step.security) }}
-                    >
-                      {step.security.toFixed(1)}
+                    <td className={TD}>
+                      <span
+                        className="font-semibold mr-1"
+                        style={{ color: secColor(step.security) }}
+                      >
+                        {step.security.toFixed(1)}
+                      </span>
+                      <span
+                        className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold border align-middle"
+                        style={secBandStyle(secBand(step.security))}
+                        data-testid="sec-band-pill"
+                        data-sec-band={secBand(step.security)}
+                      >
+                        {secBand(step.security)}
+                      </span>
                     </td>
-                    <td className="border-b border-[var(--color-line-soft)] py-[11px] px-3 align-middle text-right tabular-nums">
+                    <td className={`${TD} text-right tabular-nums`}>
                       {step.distance_ly > 0 ? step.distance_ly.toFixed(2) : '—'}
                     </td>
-                    <td className="border-b border-[var(--color-line-soft)] py-[11px] px-3 align-middle text-right tabular-nums">
+                    <td
+                      className={`${TD} text-right tabular-nums`}
+                      title={(() => {
+                        const cd = step.wait_cooldown_minutes ?? 0;
+                        const dc = step.wait_decay_minutes ?? 0;
+                        if (cd <= 0 && dc <= 0) return '';
+                        return `${formatTime(cd)} red timer + ${formatTime(dc)} fatigue wait`;
+                      })()}
+                    >
                       {step.wait_minutes > 0 ? formatTime(step.wait_minutes) : '—'}
+                      {(() => {
+                        const cd = step.wait_cooldown_minutes ?? 0;
+                        const dc = step.wait_decay_minutes ?? 0;
+                        const total = cd + dc;
+                        if (total <= 0) return null;
+                        const cdPct = (cd / total) * 100;
+                        const dcPct = (dc / total) * 100;
+                        return (
+                          <div
+                            className="mt-0.5 flex h-[3px] w-full overflow-hidden rounded-sm"
+                            data-testid="wait-bar"
+                          >
+                            <span
+                              data-testid="wait-bar-cooldown"
+                              style={{
+                                width: `${cdPct}%`,
+                                background: 'var(--color-bad)',
+                              }}
+                            />
+                            <span
+                              data-testid="wait-bar-decay"
+                              style={{
+                                width: `${dcPct}%`,
+                                background: 'var(--color-accent)',
+                              }}
+                            />
+                          </div>
+                        );
+                      })()}
                     </td>
-                    <td className="border-b border-[var(--color-line-soft)] py-[11px] px-3 align-middle text-right tabular-nums">
+                    <td className={`${TD} text-right tabular-nums`}>
                       {formatTime(step.fatigue_after_minutes)}
                     </td>
                     <td
-                      className={`border-b border-[var(--color-line-soft)] py-[11px] px-3 align-middle text-right tabular-nums ${
+                      className={`${TD} text-right tabular-nums ${
                         step.kills_per_hour > 10
                           ? 'text-[var(--color-bad)] font-semibold'
                           : step.kills_per_hour > 3
@@ -137,14 +204,19 @@ export default function RouteTable({
                     >
                       {step.kills_per_hour}
                     </td>
-                    <td className="border-b border-[var(--color-line-soft)] py-[11px] px-3 align-middle text-right tabular-nums">
-                      {step.jumps_per_hour}
+                    <td className={`${TD} text-right`}>
+                      <div className="flex justify-end">
+                        <Sparkline hourly={step.hourly_jumps ?? []} />
+                      </div>
                     </td>
-                    <td className="border-b border-[var(--color-line-soft)] py-[11px] px-3 align-middle text-right tabular-nums">
-                      {step.moon_count}
-                    </td>
+                    {showMoons && (
+                      <td className={`${TD} text-right tabular-nums`}>
+                        {step.moon_count}
+                      </td>
+                    )}
                     <td
-                      className={`border-b border-[var(--color-line-soft)] py-[11px] px-3 align-middle text-[11.5px] ${
+                      data-testid="threat-cell"
+                      className={`${TD} text-[11.5px] ${
                         z ? 'cursor-pointer text-[var(--color-accent)] hover:underline' : 'text-[var(--color-muted)]'
                       }`}
                       onClick={() => z && setSelectedStep(step)}
@@ -164,30 +236,27 @@ export default function RouteTable({
                         '—'
                       )}
                     </td>
-                    <td className="border-b border-[var(--color-line-soft)] py-[11px] px-3 align-middle text-right">
+                    <td
+                      className={`${TD} text-right`}
+                      title={[
+                        step.safe_spot_warp ? `warp ${step.safe_spot_warp}` : '',
+                        step.safe_spot_nearest ? `near ${step.safe_spot_nearest}` : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    >
                       <span
                         className="font-semibold tabular-nums"
                         style={{ color: safeColor(step.safe_spot_au) }}
                       >
                         {step.safe_spot_au.toFixed(1)}
                       </span>
-                      {step.safe_spot_warp && (
-                        <span className="block text-[10.5px] text-[var(--color-muted)] font-normal">
-                          warp {step.safe_spot_warp}
-                        </span>
-                      )}
-                      {step.safe_spot_nearest && (
-                        <span className="block text-[10.5px] text-[var(--color-muted)] font-normal">
-                          near {step.safe_spot_nearest}
-                        </span>
-                      )}
                     </td>
                   </tr>
                   {isExpanded && alts.length > 0 && (
                     <tr>
-                      {/* colSpan covers the widest case (11 cols at xl+) */}
-                      <td colSpan={11} className="p-0">
-                        <div className="bg-[#fafbfc] border-b border-[var(--color-line-soft)] px-4 py-3 text-[11.5px]">
+                      <td colSpan={totalCols} className="p-0">
+                        <div className="bg-[var(--color-surface-2)] border-b border-[var(--color-line-soft)] px-4 py-3 text-[11.5px]">
                           <div className="text-[var(--color-muted)] mb-2 font-semibold uppercase tracking-wider text-[11px]">
                             Alternatives reachable from {steps[i - 1]?.system_name}
                           </div>
@@ -195,7 +264,7 @@ export default function RouteTable({
                             {alts.map((alt) => (
                               <div
                                 key={alt.id}
-                                className="flex justify-between items-center bg-white border border-[var(--color-line)] rounded px-2.5 py-1.5 cursor-pointer hover:border-[var(--color-accent)]"
+                                className="flex justify-between items-center bg-[var(--color-paper)] border border-[var(--color-line)] rounded px-2.5 py-1.5 cursor-pointer hover:border-[var(--color-accent)]"
                                 onClick={() => {
                                   onSwap?.(i, alt.id);
                                   setExpandedHop(null);

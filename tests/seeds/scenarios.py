@@ -57,10 +57,19 @@ JUMPS_ON_DANGER: dict = {
 }
 
 # Heavy historical activity on DANGER. Tests the activity_weight knob.
+# Activity shape changed in the weekly-profile refactor: pilot_activity is now
+# the weekly mean jumps/hour (used by the cost model) and hourly_jumps is a
+# 24-element list (used by the sparkline). 1000 mirrors the old scalar so the
+# weight scaling matches the pre-refactor tests.
 ACTIVITY_ON_DANGER: dict = {
     "kills": {},
     "jumps": {},
-    "activity": {DANGER_ID: 1000},
+    "activity": {
+        DANGER_ID: {
+            "pilot_activity": 1000,
+            "hourly_jumps": [1000.0] * 24,
+        }
+    },
     "zkill": {},
 }
 

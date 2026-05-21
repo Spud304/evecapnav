@@ -320,6 +320,7 @@ def _simulate_route(
         sys_danger = danger.get(sys_id, {})
         kills = sys_danger.get("ship_kills", 0)
         jumps = sys_danger.get("ship_jumps", 0)
+        hourly = list(sys_danger.get("hourly_jumps", []))
 
         if i == 0:
             steps.append(
@@ -333,6 +334,7 @@ def _simulate_route(
                     fuel_cost=0,
                     kills_per_hour=kills,
                     jumps_per_hour=jumps,
+                    hourly_jumps=hourly,
                     safe_spot_au=s.safe_spot_au,
                     safe_spot_warp=s.safe_spot_warp,
                     safe_spot_nearest=s.safe_spot_nearest,
@@ -361,6 +363,7 @@ def _simulate_route(
                     fuel_cost=0,
                     kills_per_hour=kills,
                     jumps_per_hour=jumps,
+                    hourly_jumps=hourly,
                     safe_spot_au=s.safe_spot_au,
                     safe_spot_warp=s.safe_spot_warp,
                     safe_spot_nearest=s.safe_spot_nearest,
@@ -389,6 +392,7 @@ def _simulate_route(
                 fuel_cost=fuel,
                 kills_per_hour=kills,
                 jumps_per_hour=jumps,
+                hourly_jumps=hourly,
                 safe_spot_au=s.safe_spot_au,
                 safe_spot_warp=s.safe_spot_warp,
                 safe_spot_nearest=s.safe_spot_nearest,
@@ -396,6 +400,11 @@ def _simulate_route(
                 gate_count=s.gate_count,
                 sov_owner=s.sov_alliance_name or s.sov_faction_name,
                 edge_type="jump",
+                # Legacy A* doesn't model decay waits separately — the whole
+                # wait_minutes is treated as a red-timer cooldown so the
+                # two-tone Wait cell still has data to bind to.
+                wait_cooldown_minutes=round(total_wait, 1),
+                wait_decay_minutes=0.0,
             )
         )
         fatigue = fatigue_after

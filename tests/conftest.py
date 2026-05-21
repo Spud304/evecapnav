@@ -7,6 +7,21 @@ os.environ.setdefault("SECRET_KEY", "test-secret-key")
 import pytest
 from sqlalchemy import text
 
+
+@pytest.fixture(autouse=True, scope="session")
+def _isolate_instance_path(tmp_path_factory):
+    """Redirect cache.sqlite writes to a tempdir so tests never touch src/instance/."""
+    tmp = str(tmp_path_factory.mktemp("evecapnav_test_instance"))
+    previous = os.environ.get("EVECAPNAV_INSTANCE_PATH")
+    os.environ["EVECAPNAV_INSTANCE_PATH"] = tmp
+    try:
+        yield tmp
+    finally:
+        if previous is None:
+            os.environ.pop("EVECAPNAV_INSTANCE_PATH", None)
+        else:
+            os.environ["EVECAPNAV_INSTANCE_PATH"] = previous
+
 from src.application import Application
 from src.celery_app import celery_init_app
 from src.models.models import (

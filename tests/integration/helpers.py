@@ -124,10 +124,19 @@ def select_routing_mode(page: Page, mode: str) -> None:
     sel.select_option(value=mode)
 
 
-def set_ship_class(page: Page, label: str) -> None:
-    """Pick a ship class by its option `value` (e.g. 'Carrier', 'Jump Freighter')."""
-    sel = page.get_by_text("Ship class", exact=True).locator("..").locator("select")
-    sel.select_option(value=label)
+def set_ship(page: Page, ship_name: str) -> None:
+    """Pick a ship by its type name via the typeahead (e.g. 'Archon', 'Rhea').
+
+    Clears the input, types the name, waits for the option to appear, clicks it.
+    The picker sets shipClass internally based on the chosen ship's class label.
+    """
+    inp = page.get_by_test_id("ship-picker-input")
+    inp.fill("")
+    inp.type(ship_name, delay=20)
+    option = page.locator(f'[data-testid="ship-picker-option"][data-ship-name="{ship_name}"]').first
+    option.wait_for(state="visible")
+    option.click()
+    expect(inp).to_have_value(ship_name)
 
 
 def set_jdc(page: Page, level: int) -> None:
@@ -140,13 +149,15 @@ def set_jfc(page: Page, level: int) -> None:
     sel.select_option(value=str(level))
 
 
-def set_initial_fatigue(page: Page, minutes: int) -> None:
-    inp = (
-        page.get_by_text("Initial fatigue (min)", exact=True)
-        .locator("..")
-        .locator("input")
-    )
-    inp.fill(str(minutes))
+def set_initial_fatigue(page: Page, value: int | str) -> None:
+    """Set the Initial Fatigue field via the new text input.
+
+    Accepts either an integer (treated as raw minutes — `60` → "60") or a
+    string in any format parseFatigueInput() understands (`"1h 30m"`,
+    `"1:30"`, `"90m"`, etc.).
+    """
+    inp = page.get_by_test_id("initial-fatigue-input")
+    inp.fill(str(value))
 
 
 def set_avoid_alliances(page: Page, value: str) -> None:
@@ -199,12 +210,30 @@ def collapse_alternatives(page: Page, hop_index: int) -> None:
 
 
 def read_summary_card(page: Page) -> dict[str, str]:
-    """Return the four summary cards as `{label: primary_value}`."""
+    """Return the summary cells as `{label: primary_value}`.
+
+    The layout has five labelled cells: Total Hops, Total LY, Fuel,
+    Total Wait, and a merged Quietest cell (two lines — jumps and kills).
+    The merged cell's two lines are exposed as keys
+    ``Quietest · Jumps`` / ``Quietest · Kills`` to keep test assertions
+    stable across the merge.
+    """
     out: dict[str, str] = {}
-    for label in ("Total Hops", "Fuel", "Total Wait", "Quietest Window"):
+    for label in ("Total Hops", "Total LY", "Fuel", "Total Wait", "Risk"):
         cell = page.get_by_text(label, exact=True).locator("..")
-        # The bold primary value lives in the .text-[18px] inner div.
         out[label] = cell.locator(".text-\\[18px\\]").first.inner_text().strip()
+    # Merged Quietest cell: each line is identified by a data-testid. The
+    # cell has two children — a leading text node (the HH–HH window or "—")
+    # and a <span> with the "jumps"/"kills" caption. Read just the text node
+    # so callers see only the window value.
+    for key, testid in (
+        ("Quietest · Jumps", "quiet-jumps-line"),
+        ("Quietest · Kills", "quiet-kills-line"),
+    ):
+        text = page.get_by_test_id(testid).evaluate(
+            "el => el.childNodes[0]?.textContent?.trim() ?? ''"
+        )
+        out[key] = text
     return out
 
 
@@ -214,12 +243,14 @@ def read_summary_card(page: Page) -> dict[str, str]:
 
 
 def open_threat_modal_for(page: Page, system_name: str) -> None:
-    """Click the row's Threat cell to open the modal for a given system."""
+    """Click the row's Threat cell to open the modal for a given system.
+
+    Uses the `data-testid="threat-cell"` attribute so the test isn't
+    sensitive to the column shifting when the Moons column hides itself in
+    non-POS routing modes.
+    """
     row = route_data_rows(page).filter(has_text=system_name).first
-    # The Threat column is the 10th (1-indexed) td; clicking it opens the modal
-    # when zkill data is present. Using nth(9) (0-indexed) is robust to the
-    # exact text inside.
-    row.locator("td").nth(9).click()
+    row.locator('[data-testid="threat-cell"]').click()
     page.get_by_text("Active PVPers", exact=True).wait_for(state="visible")
 
 
@@ -383,6 +414,9 @@ def step_dict(**overrides) -> dict:
         "fuel_cost": 0,
         "kills_per_hour": 0,
         "jumps_per_hour": 0,
+        "hourly_jumps": [],
+        "wait_cooldown_minutes": 0,
+        "wait_decay_minutes": 0,
         "safe_spot_au": 10,
         "safe_spot_warp": "",
         "safe_spot_nearest": "",
@@ -417,7 +451,7 @@ def two_hop_result(**top_overrides) -> dict:
         "alternatives": {},
         "zkill": {},
         "quiet_hours": {"start": 4, "end": 8},
-        "jump_data_window": "1h",
+        "quiet_jumps": {"start": 23, "end": 3, "hourly": [0.0] * 24},
     }
     base.update(top_overrides)
     return base

@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 
 import requests
 
@@ -74,53 +75,95 @@ def fetch_system_jumps_from_api(api_url: str) -> dict[int, int]:
         return {}
 
 
-def fetch_recent_activity(api_url: str) -> dict[int, int]:
-    """Fetch recent pilot activity from the historical data API.
+def fetch_weekly_hourly_jumps(api_url: str) -> dict[int, dict]:
+    """Fetch a per-system hour-of-day jump profile averaged over the past week.
 
-    Prefers the most recent snapshot (~last 30 min). If no recent snapshot
-    exists, falls back to the 24h average per system.
-    Returns {system_id: activity_count}.
+    Calls /api/jumps/history?window=week (up to 168 hourly snapshots) and
+    buckets each snapshot's systems by hour-of-day UTC. Returns:
+        {system_id: {
+            "pilot_activity": int,   # mean jumps/hour over the whole week
+            "hourly_jumps":   [24],  # per-hour means, UTC, index 0=00:00
+        }}
     """
     try:
         resp = requests.get(
-            f"{api_url}/api/jumps/history", params={"window": "24h"}, timeout=30
+            f"{api_url}/api/jumps/history", params={"window": "week"}, timeout=60
         )
         if resp.status_code != 200:
             logger.warning(
-                "Failed to fetch activity history from API: status=%s", resp.status_code
+                "Failed to fetch weekly history from API: status=%s", resp.status_code
             )
             return {}
-        data = resp.json()
-        snapshots = data.get("snapshots", [])
+        snapshots = resp.json().get("snapshots", [])
         if not snapshots:
             return {}
 
-        # Use most recent snapshot as "last 30 min" proxy
-        recent = snapshots[-1].get("systems", {})
-        if recent:
-            result = {int(sid): count for sid, count in recent.items()}
-            logger.info(
-                "Loaded recent activity: %d systems from latest snapshot", len(result)
-            )
-            return result
+        sums: dict[int, list[int]] = {}
+        counts = [0] * 24
+        for snap in snapshots:
+            try:
+                hour = datetime.fromisoformat(snap["timestamp"]).hour
+            except (KeyError, ValueError):
+                continue
+            counts[hour] += 1
+            for sid_str, jumps in snap.get("systems", {}).items():
+                sid = int(sid_str)
+                bucket = sums.setdefault(sid, [0] * 24)
+                bucket[hour] += jumps
 
-        # Fallback: average across all 24h snapshots
-        totals: dict[int, int] = {}
-        for snapshot in snapshots:
-            for sys_id_str, count in snapshot.get("systems", {}).items():
-                sid = int(sys_id_str)
-                totals[sid] = totals.get(sid, 0) + count
-        n = len(snapshots)
-        result = {sid: total // n for sid, total in totals.items()}
+        result: dict[int, dict] = {}
+        for sid, bucket in sums.items():
+            hourly = [
+                bucket[h] / counts[h] if counts[h] else 0.0 for h in range(24)
+            ]
+            mean = sum(hourly) / 24
+            result[sid] = {
+                "pilot_activity": int(round(mean)),
+                "hourly_jumps": hourly,
+            }
         logger.info(
-            "Loaded 24h average activity: %d systems from %d snapshots",
+            "Built weekly hourly profile: %d systems from %d snapshots",
             len(result),
-            n,
+            len(snapshots),
         )
         return result
     except requests.RequestException as e:
-        logger.warning("Activity history request failed: %s", e)
+        logger.warning("Weekly history request failed: %s", e)
         return {}
+
+
+# Cap-ship isotope type IDs (SDE marketGroup 1396). All four are returned —
+# downstream code picks one (currently Helium) as a pricing proxy until per-
+# race fuel-cost accounting is wired up.
+FUEL_TYPE_IDS = {
+    16274: "Helium Isotopes",
+    17887: "Oxygen Isotopes",
+    17888: "Nitrogen Isotopes",
+    17889: "Hydrogen Isotopes",
+}
+
+
+def fetch_fuel_prices() -> dict[int, float]:
+    """Fetch global average prices for cap-ship isotopes from ESI.
+
+    Calls `GET /markets/prices/` (public, no auth). Filters to the four
+    capital-ship isotope type_ids. Returns {type_id: average_price_isk}.
+    Missing/unparseable types are skipped silently.
+    """
+    status, data = esi_get(f"{ESI_BASE_URL}/markets/prices/")
+    if status != 200 or not isinstance(data, list):
+        logger.warning("Failed to fetch fuel prices: status=%s", status)
+        return {}
+    out: dict[int, float] = {}
+    for entry in data:
+        tid = entry.get("type_id")
+        if tid in FUEL_TYPE_IDS:
+            try:
+                out[int(tid)] = float(entry.get("average_price", 0))
+            except (TypeError, ValueError):
+                continue
+    logger.info("Fetched fuel prices for %d isotope types", len(out))
+    return out
 
 
 def fetch_sovereignty() -> dict[int, dict]:

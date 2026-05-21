@@ -62,6 +62,15 @@ export default function App() {
   const activeSteps = result ? result.steps : [];
   const activeWait = result ? result.total_wait_minutes : 0;
   const activeFuel = result ? result.total_fuel : 0;
+  const totalLy = activeSteps.reduce(
+    (acc, s) => acc + (s.edge_type === 'jump' ? s.distance_ly : 0),
+    0,
+  );
+  const arrivalHHMM = (() => {
+    if (!result || activeWait <= 0) return null;
+    const ms = Date.now() + activeWait * 60_000;
+    return new Date(ms).toISOString().slice(11, 16);
+  })();
 
   function copyAsText() {
     if (!result) return;
@@ -101,7 +110,7 @@ export default function App() {
 
   return (
     <>
-      <header className="bg-white border-b border-[var(--color-line)]">
+      <header className="bg-[var(--color-paper)] border-b border-[var(--color-line)]">
         <div className="max-w-[1080px] mx-auto px-[22px] py-[14px] flex items-baseline gap-5">
           <h1 className="m-0 text-[18px] font-semibold tracking-tight">
             <span className="inline-block w-2 h-2 rounded-full bg-[var(--color-accent)] mr-2 align-middle translate-y-[-1px]" />
@@ -129,13 +138,13 @@ export default function App() {
         )}
 
         {error && (
-          <div className="mb-[18px] px-4 py-2 rounded-lg border border-red-300 bg-red-50 text-red-800 text-[13px]">
+          <div className="mb-[18px] px-4 py-2 rounded-lg border border-[rgba(248,81,73,0.4)] bg-[rgba(248,81,73,0.10)] text-[var(--color-bad)] text-[13px]">
             {error}
           </div>
         )}
 
         {result && result.steps.length > 0 && (
-          <div className="grid grid-cols-[repeat(4,1fr)_auto] bg-white border border-[var(--color-line)] rounded-lg shadow-[0_1px_1px_rgba(20,25,40,0.04)] overflow-hidden mb-[18px]">
+          <div className="grid grid-cols-[repeat(6,1fr)_auto] bg-[var(--color-paper)] border border-[var(--color-line)] rounded-lg shadow-[0_1px_2px_rgba(0,0,0,0.35)] overflow-hidden mb-[18px]">
             <div className="px-[18px] py-[14px] border-r border-[var(--color-line-soft)]">
               <div className="text-[11px] uppercase tracking-wider text-[var(--color-muted)] mb-1">
                 Total Hops
@@ -150,30 +159,99 @@ export default function App() {
             </div>
             <div className="px-[18px] py-[14px] border-r border-[var(--color-line-soft)]">
               <div className="text-[11px] uppercase tracking-wider text-[var(--color-muted)] mb-1">
+                Total LY
+              </div>
+              <div className="text-[18px] font-semibold">{totalLy.toFixed(1)}</div>
+              <div className="text-xs text-[var(--color-muted)]">jump-drive distance</div>
+            </div>
+            <div className="px-[18px] py-[14px] border-r border-[var(--color-line-soft)]">
+              <div className="text-[11px] uppercase tracking-wider text-[var(--color-muted)] mb-1">
                 Fuel
               </div>
               <div className="text-[18px] font-semibold">
                 {activeFuel.toLocaleString()}
               </div>
-              <div className="text-xs text-[var(--color-muted)]">isotopes</div>
+              <div className="text-xs text-[var(--color-muted)]">
+                {result.total_fuel_isk && result.total_fuel_isk > 0 ? (
+                  <span data-testid="fuel-isk">
+                    ~{(result.total_fuel_isk / 1_000_000).toFixed(1)}M ISK
+                  </span>
+                ) : (
+                  'isotopes'
+                )}
+              </div>
             </div>
             <div className="px-[18px] py-[14px] border-r border-[var(--color-line-soft)]">
               <div className="text-[11px] uppercase tracking-wider text-[var(--color-muted)] mb-1">
                 Total Wait
               </div>
               <div className="text-[18px] font-semibold">{formatTime(activeWait)}</div>
-              <div className="text-xs text-[var(--color-muted)]">red + blue timers</div>
+              <div className="text-xs text-[var(--color-muted)]">
+                {arrivalHHMM ? (
+                  <span data-testid="arrival-time">arrive ~{arrivalHHMM} UTC</span>
+                ) : (
+                  'red + blue timers'
+                )}
+              </div>
+            </div>
+            <div
+              className="px-[18px] py-[14px] border-r border-[var(--color-line-soft)]"
+              title={
+                result.risk_breakdown
+                  ? `${result.risk_breakdown.kills} kills · ${result.risk_breakdown.peak_jumps} peak jumps · ${result.risk_breakdown.dead_ends} dead-ends · ${result.risk_breakdown.hostile_systems} hostile`
+                  : undefined
+              }
+            >
+              <div className="text-[11px] uppercase tracking-wider text-[var(--color-muted)] mb-1">
+                Risk
+              </div>
+              {(() => {
+                const r = result.risk_score ?? 0;
+                const color =
+                  r >= 60
+                    ? 'var(--color-bad)'
+                    : r >= 30
+                    ? 'var(--color-warn)'
+                    : 'var(--color-good)';
+                return (
+                  <div
+                    className="text-[18px] font-semibold"
+                    style={{ color }}
+                    data-testid="risk-score"
+                    data-risk-band={r >= 60 ? 'high' : r >= 30 ? 'mid' : 'low'}
+                  >
+                    {r}%
+                  </div>
+                );
+              })()}
+              <div className="text-xs text-[var(--color-muted)]">composite</div>
             </div>
             <div className="px-[18px] py-[14px] border-r border-[var(--color-line-soft)]">
               <div className="text-[11px] uppercase tracking-wider text-[var(--color-muted)] mb-1">
-                Quietest Window
+                Quietest
               </div>
-              <div className="text-[18px] font-semibold">
+              <div
+                className="text-[14px] font-semibold text-[var(--color-good)] leading-tight"
+                data-testid="quiet-jumps-line"
+              >
+                {result.quiet_jumps
+                  ? `${String(result.quiet_jumps.start).padStart(2, '0')}–${String(result.quiet_jumps.end).padStart(2, '0')}`
+                  : '—'}
+                <span className="text-[10.5px] text-[var(--color-muted)] font-normal ml-1.5">
+                  jumps
+                </span>
+              </div>
+              <div
+                className="text-[14px] font-semibold text-[var(--color-bad)] leading-tight mt-0.5"
+                data-testid="quiet-kills-line"
+              >
                 {result.quiet_hours
                   ? `${String(result.quiet_hours.start).padStart(2, '0')}–${String(result.quiet_hours.end).padStart(2, '0')}`
                   : '—'}
+                <span className="text-[10.5px] text-[var(--color-muted)] font-normal ml-1.5">
+                  kills
+                </span>
               </div>
-              <div className="text-xs text-[var(--color-muted)]">UTC</div>
             </div>
             <div className="px-[18px] py-[14px] flex flex-col gap-1.5 items-end justify-center">
               <button
@@ -198,7 +276,7 @@ export default function App() {
               steps={activeSteps}
               zkill={result.zkill}
               alternatives={result.alternatives}
-              jumpDataWindow={result.jump_data_window}
+              mode={routeParamsRef.current?.mode as 'safe' | 'direct' | 'pos' | undefined}
               onSwap={handleSwap}
             />
           </section>

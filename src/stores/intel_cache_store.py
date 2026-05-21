@@ -1,5 +1,6 @@
 """File-based cache for computed data (SDE-derived and ESI-derived)."""
 
+import json
 import logging
 import os
 import sqlite3
@@ -22,10 +23,19 @@ def _cache_path(instance_path: str) -> str:
     return os.path.join(instance_path, "cache.sqlite")
 
 
+def _migrate_esi_activity(conn: sqlite3.Connection) -> None:
+    """Drop esi_activity if it predates the hourly_jumps column."""
+    cols = [r[1] for r in conn.execute("PRAGMA table_info(esi_activity)").fetchall()]
+    if cols and "hourly_jumps" not in cols:
+        conn.execute("DROP TABLE esi_activity")
+        logger.info("Migrated esi_activity: dropped old schema for recreate")
+
+
 def _init_cache_db(path: str) -> None:
     if path in _initialized_paths:
         return
     conn = sqlite3.connect(path)
+    _migrate_esi_activity(conn)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS safe_spots (
             system_id INTEGER PRIMARY KEY,
@@ -66,7 +76,8 @@ def _init_cache_db(path: str) -> None:
     conn.execute("""
         CREATE TABLE IF NOT EXISTS esi_activity (
             system_id INTEGER PRIMARY KEY,
-            pilot_activity INTEGER DEFAULT 0
+            pilot_activity INTEGER DEFAULT 0,
+            hourly_jumps TEXT DEFAULT '[]'
         )
     """)
     conn.execute("""
@@ -78,6 +89,13 @@ def _init_cache_db(path: str) -> None:
             gang_ratio TEXT DEFAULT '0%',
             ships_destroyed INTEGER DEFAULT 0,
             cached_at TEXT
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS fuel_prices (
+            type_id INTEGER PRIMARY KEY,
+            avg_price REAL NOT NULL,
+            fetched_at TEXT NOT NULL
         )
     """)
     conn.commit()
@@ -208,16 +226,70 @@ def save_esi_jumps(instance_path: str, jumps: dict[int, int]) -> None:
     _invalidate_danger_cache()
 
 
-def save_esi_activity(instance_path: str, activity: dict[int, int]) -> None:
-    """Save recent pilot activity data."""
+def save_esi_activity(instance_path: str, activity: dict[int, dict]) -> None:
+    """Save per-system weekly hour-of-day jump activity.
+
+    activity: {system_id: {"pilot_activity": int, "hourly_jumps": list[int|float]}}
+    """
+    rows = [
+        (
+            sid,
+            int(d.get("pilot_activity", 0)),
+            json.dumps(d.get("hourly_jumps", [])),
+        )
+        for sid, d in activity.items()
+    ]
     _save_esi_table(
         instance_path,
         "esi_activity",
-        "system_id, pilot_activity",
-        "?, ?",
-        list(activity.items()),
+        "system_id, pilot_activity, hourly_jumps",
+        "?, ?, ?",
+        rows,
     )
     _invalidate_danger_cache()
+
+
+def save_fuel_prices(instance_path: str, prices: dict[int, float]) -> None:
+    """Replace cached fuel prices in cache.sqlite. `prices` maps isotope
+    type_id → ESI average price in ISK."""
+    if not prices:
+        return
+    path = _cache_path(instance_path)
+    _init_cache_db(path)
+    now = datetime.now(timezone.utc).isoformat()
+    conn = sqlite3.connect(path)
+    conn.execute("BEGIN EXCLUSIVE")
+    try:
+        conn.execute("DELETE FROM fuel_prices")
+        conn.executemany(
+            "INSERT INTO fuel_prices (type_id, avg_price, fetched_at) VALUES (?, ?, ?)",
+            [(tid, float(price), now) for tid, price in prices.items()],
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+    logger.info("Saved %d fuel prices", len(prices))
+
+
+def load_fuel_prices(instance_path: str) -> dict[int, float]:
+    """Load cached fuel prices. Returns {} when the table is empty."""
+    path = _cache_path(instance_path)
+    if not os.path.exists(path):
+        return {}
+    _init_cache_db(path)
+    conn = sqlite3.connect(path)
+    try:
+        rows = conn.execute(
+            "SELECT type_id, avg_price FROM fuel_prices"
+        ).fetchall()
+    except sqlite3.OperationalError:
+        return {}
+    finally:
+        conn.close()
+    return {int(r[0]): float(r[1]) for r in rows}
 
 
 def save_sovereignty(
@@ -365,41 +437,40 @@ def load_danger_data(instance_path: str) -> dict[int, dict]:
     _init_cache_db(path)
     conn = sqlite3.connect(path)
 
+    def _blank() -> dict:
+        return {
+            "ship_kills": 0,
+            "npc_kills": 0,
+            "pod_kills": 0,
+            "ship_jumps": 0,
+            "pilot_activity": 0,
+            "hourly_jumps": [0] * 24,
+        }
+
     result: dict[int, dict] = {}
     for row in conn.execute(
         "SELECT system_id, ship_kills, npc_kills, pod_kills FROM esi_kills"
     ):
-        result[row[0]] = {
-            "ship_kills": row[1],
-            "npc_kills": row[2],
-            "pod_kills": row[3],
-            "ship_jumps": 0,
-            "pilot_activity": 0,
-        }
+        entry = _blank()
+        entry["ship_kills"] = row[1]
+        entry["npc_kills"] = row[2]
+        entry["pod_kills"] = row[3]
+        result[row[0]] = entry
     for row in conn.execute("SELECT system_id, ship_jumps FROM esi_jumps"):
-        if row[0] in result:
-            result[row[0]]["ship_jumps"] = row[1]
-        else:
-            result[row[0]] = {
-                "ship_kills": 0,
-                "npc_kills": 0,
-                "pod_kills": 0,
-                "ship_jumps": row[1],
-                "pilot_activity": 0,
-            }
-    # Load historical pilot activity if available
+        entry = result.setdefault(row[0], _blank())
+        entry["ship_jumps"] = row[1]
     try:
-        for row in conn.execute("SELECT system_id, pilot_activity FROM esi_activity"):
-            if row[0] in result:
-                result[row[0]]["pilot_activity"] = row[1]
-            else:
-                result[row[0]] = {
-                    "ship_kills": 0,
-                    "npc_kills": 0,
-                    "pod_kills": 0,
-                    "ship_jumps": 0,
-                    "pilot_activity": row[1],
-                }
+        for row in conn.execute(
+            "SELECT system_id, pilot_activity, hourly_jumps FROM esi_activity"
+        ):
+            entry = result.setdefault(row[0], _blank())
+            entry["pilot_activity"] = row[1]
+            try:
+                parsed = json.loads(row[2]) if row[2] else []
+                if isinstance(parsed, list) and len(parsed) == 24:
+                    entry["hourly_jumps"] = parsed
+            except (ValueError, TypeError):
+                pass
     except sqlite3.OperationalError:
         pass  # Table may not exist yet on first run
     conn.close()

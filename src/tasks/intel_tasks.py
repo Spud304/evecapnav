@@ -6,10 +6,11 @@ import os
 from celery import shared_task
 
 from src.clients.esi_client import (
-    fetch_recent_activity,
+    fetch_fuel_prices,
     fetch_system_jumps,
     fetch_system_jumps_from_api,
     fetch_system_kills,
+    fetch_weekly_hourly_jumps,
 )
 from src.stores.intel_cache_store import (
     load_danger_data,
@@ -17,6 +18,7 @@ from src.stores.intel_cache_store import (
     save_esi_activity,
     save_esi_jumps,
     save_esi_kills,
+    save_fuel_prices,
 )
 
 logger = logging.getLogger(__name__)
@@ -57,9 +59,15 @@ def poll_system_stats():
 
     if source == "fastapi":
         api_url = os.environ.get("JUMP_API_URL", "http://localhost:8001")
-        activity = fetch_recent_activity(api_url)
+        activity = fetch_weekly_hourly_jumps(api_url)
         if activity:
             save_esi_activity(instance, activity)
+
+    # Fuel-cost-in-ISK pricing — hourly is plenty fresh for an isk/fuel cell
+    # that pilots only glance at when planning a route.
+    prices = fetch_fuel_prices()
+    if prices:
+        save_fuel_prices(instance, prices)
 
     if kills or jumps:
         mark_esi_updated(instance)

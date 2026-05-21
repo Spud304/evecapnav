@@ -109,6 +109,62 @@ def _fallback_ship_classes() -> dict[str, ShipClass]:
     return {c.label: c for c in classes}
 
 
+def load_cap_ship_types(
+    ship_classes: dict[str, "ShipClass"],
+) -> list[dict]:
+    """Return all published, jump-capable cap ship types with their parent class label.
+
+    [{type_id, type_name, group_id, class_label, base_range_ly}, ...]
+    Group → class_label is derived by scanning ship_classes (a group can belong
+    to exactly one merged class). Ships whose group isn't in any class are dropped.
+    """
+    group_to_label: dict[int, str] = {}
+    group_to_range: dict[int, float] = {}
+    group_to_fuel: dict[int, float] = {}
+    group_to_fatigue: dict[int, float] = {}
+    for label, sc in ship_classes.items():
+        for gid in sc.group_ids:
+            group_to_label[gid] = label
+            group_to_range[gid] = sc.base_range_ly
+            group_to_fuel[gid] = sc.fuel_per_ly
+            group_to_fatigue[gid] = sc.fatigue_multiplier
+
+    group_ids = sorted(group_to_label.keys())
+    if not group_ids:
+        return []
+    placeholders = ", ".join(f":g{i}" for i in range(len(group_ids)))
+    params = {f"g{i}": gid for i, gid in enumerate(group_ids)}
+
+    with db.engine.connect() as conn:
+        rows = conn.execute(
+            text(
+                f"""
+                SELECT t.typeID, n.en, t.groupID
+                FROM EveType t
+                JOIN EveTypeName n ON n.parentTypeId = t.typeID
+                WHERE t.groupID IN ({placeholders})
+                  AND t.published = 1
+                ORDER BY n.en
+                """
+            ),
+            params,
+        ).fetchall()
+
+    return [
+        {
+            "type_id": int(type_id),
+            "type_name": type_name,
+            "group_id": int(group_id),
+            "class_label": group_to_label[int(group_id)],
+            "base_range_ly": group_to_range[int(group_id)],
+            "fuel_per_ly": group_to_fuel[int(group_id)],
+            "fatigue_multiplier": group_to_fatigue[int(group_id)],
+        }
+        for type_id, type_name, group_id in rows
+        if int(group_id) in group_to_label
+    ]
+
+
 def get_effective_range(base_range: float, jdc_level: int) -> float:
     """Compute effective jump range with Jump Drive Calibration skill."""
     return base_range * (1 + 0.20 * jdc_level)

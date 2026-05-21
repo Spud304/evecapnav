@@ -1,7 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import SystemSearch from './SystemSearch';
-import { getShipClasses, planRouteSSE } from '../api';
-import type { ShipClass, RouteResult } from '../types';
+import ShipPicker from './ShipPicker';
+import { planRouteSSE } from '../api';
+import { loadPrefs, savePrefs, clearPrefs } from '../utils/persistence';
+import { parseFatigueInput, formatTime } from '../utils/format';
+import type { RouteResult } from '../types';
 
 const DEFAULT_WEIGHTS = {
   base_system_cost: 200,
@@ -53,20 +56,36 @@ interface Props {
 }
 
 export default function RouteControls({ onResult, onError, onProgress, onSystemFocus }: Props) {
-  const [shipClasses, setShipClasses] = useState<ShipClass[]>([]);
-  const [originId, setOriginId] = useState<number | null>(null);
-  const [destId, setDestId] = useState<number | null>(null);
-  const [shipClass, setShipClass] = useState('');
-  const [jdc, setJdc] = useState(5);
-  const [jfc, setJfc] = useState(4);
-  const [fatigue, setFatigue] = useState(0);
-  const [mode, setMode] = useState<'safe' | 'direct' | 'pos'>('safe');
-  const [jfSkill, setJfSkill] = useState(4);
+  // Hydrate from localStorage on first render. SystemSearch and ShipPicker
+  // both accept the resolved name as a defaultValue so the displayed text
+  // round-trips correctly.
+  const initialPrefs = loadPrefs();
+  const [originId, setOriginId] = useState<number | null>(initialPrefs.originId ?? null);
+  const [originName] = useState(initialPrefs.originName ?? '');
+  const [destId, setDestId] = useState<number | null>(initialPrefs.destId ?? null);
+  const [destName] = useState(initialPrefs.destName ?? '');
+  const [shipClass, setShipClass] = useState(initialPrefs.shipClass ?? '');
+  const [shipName, setShipName] = useState(initialPrefs.shipName ?? '');
+  const [jdc, setJdc] = useState(initialPrefs.jdc ?? 5);
+  const [jfc, setJfc] = useState(initialPrefs.jfc ?? 4);
+  const [fatigue, setFatigue] = useState(initialPrefs.initialFatigue ?? 0);
+  const [fatigueRaw, setFatigueRaw] = useState(
+    (initialPrefs.initialFatigue ?? 0) > 0
+      ? formatTime(initialPrefs.initialFatigue ?? 0)
+      : '',
+  );
+  const [fatigueError, setFatigueError] = useState(false);
+  const [mode, setMode] = useState<'safe' | 'direct' | 'pos'>(
+    initialPrefs.mode ?? 'safe',
+  );
+  const [jfSkill, setJfSkill] = useState(initialPrefs.jfSkill ?? 4);
   const [avoidAlliances, setAvoidAlliances] = useState('');
   const [loading, setLoading] = useState(false);
   const esRef = useRef<EventSource | null>(null);
 
-  const [gateMode, setGateMode] = useState<'off' | 'interregional' | 'all'>('off');
+  const [gateMode, setGateMode] = useState<'off' | 'interregional' | 'all'>(
+    initialPrefs.gateMode ?? 'off',
+  );
   const [gateEquivalentJumps, setGateEquivalentJumps] = useState(5);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [baseSystemCost, setBaseSystemCost] = useState(DEFAULT_WEIGHTS.base_system_cost);
@@ -76,18 +95,80 @@ export default function RouteControls({ onResult, onError, onProgress, onSystemF
   const [activityWeight, setActivityWeight] = useState(DEFAULT_WEIGHTS.activity_weight);
   const [deadEndPenalty, setDeadEndPenalty] = useState(DEFAULT_WEIGHTS.dead_end_penalty);
   const [posMoonBonus, setPosMoonBonus] = useState(DEFAULT_WEIGHTS.pos_moon_bonus);
-  const [waitWeight, setWaitWeight] = useState(DEFAULT_WEIGHTS.wait_weight);
+  const [waitWeight, setWaitWeight] = useState(
+    initialPrefs.waitWeight ?? DEFAULT_WEIGHTS.wait_weight,
+  );
 
+  // Cache the resolved origin/dest names so we can re-persist them as they change.
+  const originNameRef = useRef(initialPrefs.originName ?? '');
+  const destNameRef = useRef(initialPrefs.destName ?? '');
+
+  function handleShipPick(ship: { type_name: string; class_label: string }) {
+    setShipName(ship.type_name);
+    setShipClass(ship.class_label);
+  }
+
+  // Persist the form state to localStorage 500ms after the last change, so
+  // typing into Avoid alliances doesn't pile up writes. Wide deps array — we
+  // want every commit-worthy field to trigger a re-save.
   useEffect(() => {
-    getShipClasses().then((classes) => {
-      setShipClasses(classes);
-      if (classes.length > 0) setShipClass(classes[0].label);
-    });
-  }, []);
+    const handle = setTimeout(() => {
+      savePrefs({
+        originId: originId ?? undefined,
+        originName: originNameRef.current || undefined,
+        destId: destId ?? undefined,
+        destName: destNameRef.current || undefined,
+        shipName: shipName || undefined,
+        shipClass: shipClass || undefined,
+        jdc,
+        jfc,
+        jfSkill,
+        initialFatigue: fatigue,
+        mode,
+        gateMode,
+        waitWeight,
+      });
+    }, 500);
+    return () => clearTimeout(handle);
+  }, [originId, destId, shipName, shipClass, jdc, jfc, jfSkill, fatigue, mode, gateMode, waitWeight]);
+
+  function handleResetAll() {
+    clearPrefs();
+    setOriginId(null);
+    setDestId(null);
+    setShipClass('');
+    setShipName('');
+    setJdc(5);
+    setJfc(4);
+    setJfSkill(4);
+    setFatigue(0);
+    setMode('safe');
+    setGateMode('off');
+    setAvoidAlliances('');
+    setWaitWeight(DEFAULT_WEIGHTS.wait_weight);
+    setBaseSystemCost(DEFAULT_WEIGHTS.base_system_cost);
+    setDistanceExponent(DEFAULT_WEIGHTS.distance_exponent);
+    setDangerWeight(DEFAULT_WEIGHTS.danger_weight);
+    setJumpsWeight(DEFAULT_WEIGHTS.jumps_weight);
+    setActivityWeight(DEFAULT_WEIGHTS.activity_weight);
+    setDeadEndPenalty(DEFAULT_WEIGHTS.dead_end_penalty);
+    setPosMoonBonus(DEFAULT_WEIGHTS.pos_moon_bonus);
+    // SystemSearch and ShipPicker pull their initial display value from
+    // props on first render — reload the page so they re-mount cleanly.
+    setTimeout(() => window.location.reload(), 50);
+  }
 
   function handlePlan() {
     if (!originId || !destId) {
       onError('Please select both origin and destination systems.');
+      return;
+    }
+    if (!shipClass) {
+      onError('Please pick a ship.');
+      return;
+    }
+    if (fatigueError) {
+      onError('Initial fatigue is in an unrecognized format. Use “1h 30m” or a number of minutes.');
       return;
     }
 
@@ -191,8 +272,10 @@ export default function RouteControls({ onResult, onError, onProgress, onSystemF
           <div className="flex flex-col">
             <SystemSearch
               label="Origin"
-              onSelect={(id) => {
+              defaultValue={originName}
+              onSelect={(id, name) => {
                 setOriginId(id);
+                originNameRef.current = name;
                 onSystemFocus?.(id);
               }}
             />
@@ -200,25 +283,16 @@ export default function RouteControls({ onResult, onError, onProgress, onSystemF
           <div className="flex flex-col">
             <SystemSearch
               label="Destination"
-              onSelect={(id) => {
+              defaultValue={destName}
+              onSelect={(id, name) => {
                 setDestId(id);
+                destNameRef.current = name;
                 onSystemFocus?.(id);
               }}
             />
           </div>
           <div className="flex flex-col">
-            <label className="field-label">Ship class</label>
-            <select
-              value={shipClass}
-              onChange={(e) => setShipClass(e.target.value)}
-              className="select"
-            >
-              {shipClasses.map((c) => (
-                <option key={c.label} value={c.label}>
-                  {c.label} ({c.base_range_ly} LY)
-                </option>
-              ))}
-            </select>
+            <ShipPicker value={shipName} jdcLevel={jdc} onSelect={handleShipPick} />
           </div>
           <div className="flex flex-col">
             <label className="field-label">Routing mode</label>
@@ -278,18 +352,34 @@ export default function RouteControls({ onResult, onError, onProgress, onSystemF
             </div>
           )}
           <div className="flex flex-col">
-            <label className="field-label">Initial fatigue (min)</label>
+            <label className="field-label">Initial fatigue</label>
             <input
-              type="number"
-              value={fatigue}
-              onChange={(e) => setFatigue(Number(e.target.value))}
-              min={0}
-              max={720}
+              type="text"
+              value={fatigueRaw}
+              onChange={(e) => {
+                const raw = e.target.value;
+                setFatigueRaw(raw);
+                const parsed = parseFatigueInput(raw);
+                if (Number.isNaN(parsed)) {
+                  setFatigueError(true);
+                } else {
+                  setFatigueError(false);
+                  setFatigue(parsed);
+                }
+              }}
+              placeholder="0  ·  1h 30m  ·  1:30  ·  90m"
               className="input"
+              data-testid="initial-fatigue-input"
             />
-            <span className="text-[11px] text-[var(--color-muted)] mt-[3px]">
-              Leave 0 if rested.
-            </span>
+            {fatigueError ? (
+              <span className="text-[11px] text-[var(--color-bad)] mt-[3px]">
+                Unrecognized format. Try “1h 30m”, “1:30”, “90m”, or a bare number of minutes.
+              </span>
+            ) : (
+              <span className="text-[11px] text-[var(--color-muted)] mt-[3px]">
+                Leave empty if rested.
+              </span>
+            )}
           </div>
           <div className={`flex flex-col ${isJf ? 'md:col-span-3' : 'md:col-span-2'}`}>
             <label className="field-label">Avoid alliances</label>
@@ -350,10 +440,17 @@ export default function RouteControls({ onResult, onError, onProgress, onSystemF
               setWaitWeight(sliderToWaitWeight(Number(e.target.value)))
             }
             className="w-full"
+            list="wait-weight-stops"
           />
-          <div className="flex justify-between text-[11px] text-[var(--color-muted)] mt-[3px]">
-            <span>Least jumps (tolerate fatigue, fewer JD hops)</span>
-            <span>Quickest (avoid fatigue waits, more hops OK)</span>
+          <datalist id="wait-weight-stops">
+            <option value="0" label="Quickest" />
+            <option value="50" label="Balanced" />
+            <option value="100" label="Least jumps" />
+          </datalist>
+          <div className="grid grid-cols-3 text-[11px] text-[var(--color-muted)] mt-[3px]">
+            <span className="text-left">Quickest</span>
+            <span className="text-center">Balanced</span>
+            <span className="text-right">Least jumps</span>
           </div>
         </div>
 
@@ -367,6 +464,14 @@ export default function RouteControls({ onResult, onError, onProgress, onSystemF
               {showAdvanced ? '▾' : '▸'} Advanced cost weights
             </button>
           )}
+          <button
+            type="button"
+            onClick={handleResetAll}
+            data-testid="reset-all-button"
+            className="text-[12px] text-[var(--color-muted)] hover:text-[var(--color-ink)] underline"
+          >
+            ↺ Clear saved
+          </button>
           <div className="flex-1" />
           {mode !== 'direct' && showAdvanced && (
             <button
