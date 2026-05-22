@@ -15,13 +15,14 @@ def load_systems() -> dict[int, SystemInfo]:
     Filters:
       - security < 0.5: canonical lowsec/hisec line. Caps can jump into
         lowsec but not hisec.
-      - regionID < 11000000: excludes J-space (Anoikis), Pochven, Abyssal,
-        Jove. K-space is 10000001-10000069.
+      - regionID < 10000070: K-space proper. Excludes Pochven (10000070),
+        Yasna Zakh / Zarzakh (10001000), Exordium (10001004), Anoikis
+        (11000001+) and other special regions caps can't enter.
     """
     rows = (
         db.session.query(MapSolarSystem)
         .filter(MapSolarSystem.security < 0.5)
-        .filter(MapSolarSystem.regionID < 11000000)
+        .filter(MapSolarSystem.regionID < 10000070)
         .all()
     )
 
