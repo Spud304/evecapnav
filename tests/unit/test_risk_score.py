@@ -10,7 +10,7 @@ class _Step:
     """Minimal step-shape stand-in. compute_risk_score uses getattr so we
     don't need to import the real RouteStep dataclass."""
     kills_per_hour: int = 0
-    hourly_jumps: list = None
+    hourly_jumps: list | None = None
     gate_count: int = 5
     sov_owner: str = ""
 
