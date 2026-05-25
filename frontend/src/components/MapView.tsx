@@ -4,6 +4,7 @@ import 'd3-transition'; // extends Selection.prototype with .transition()
 import { zoom, zoomIdentity, type D3ZoomEvent, type ZoomBehavior } from 'd3-zoom';
 import { quadtree, type Quadtree } from 'd3-quadtree';
 import { getMapData } from '../api';
+import { getSovColor as sovColor } from '../utils/sovColors';
 import type { MapData, MapSystem, RouteStep } from '../types';
 
 interface Props {
@@ -20,51 +21,6 @@ function secColor(sec: number): string {
   if (sec >= 0.45) return '#4f8df0';
   if (sec >= 0.0) return '#e5b03d';
   return '#c14343';
-}
-
-// Hardcoded palette for the big sov holders and NPC factions. Names must
-// match the SDE's `sov_alliance_name` / `sov_faction_name` exactly.
-const KNOWN_SOV_COLORS: Record<string, string> = {
-  'Goonswarm Federation': '#ff7733',
-  'Pandemic Horde': '#3ec25b',
-  'Brave Collective': '#a26ad8',
-  'Fraternity.': '#d33e3e',
-  'The Initiative.': '#5a8a5a',
-  'TEST Alliance Please Ignore': '#5fbf8f',
-  'Wings Freedom.': '#d97aa1',
-  'Sigma Grindset': '#c4894e',
-  'OnlyFleets.': '#7090ff',
-  'Reeloaded.': '#dd5577',
-  'Dracarys.': '#e0594a',
-  'Vanguard.': '#7a9adf',
-  'Kinetic Diplomacy': '#a4b85f',
-  'Invidia Gloriae Comes': '#cf6f3c',
-  'Burning Contingent Holdings': '#b85050',
-  'Blood Raider Covenant': '#9a2030',
-  'Amarr Empire': '#d4a45a',
-  'Caldari State': '#5570a0',
-  'Gallente Federation': '#3aa088',
-  'Minmatar Republic': '#a25040',
-  'Khanid Kingdom': '#b87a3a',
-  'Ammatar Mandate': '#a5704a',
-  'CONCORD Assembly': '#6f7a90',
-  "Sansha's Nation": '#5a4060',
-  'Guristas Pirates': '#8a8a40',
-  'Serpentis': '#3a8a6a',
-  'Angel Cartel': '#9a8030',
-  "Mordu's Legion Command": '#5a5fb0',
-  'The Society of Conscious Thought': '#7a8a9a',
-};
-
-function sovColor(sov: string): string | null {
-  if (!sov) return null;
-  if (KNOWN_SOV_COLORS[sov]) return KNOWN_SOV_COLORS[sov];
-  let h = 0;
-  for (let i = 0; i < sov.length; i++) {
-    h = (Math.imul(h, 31) + sov.charCodeAt(i)) | 0;
-  }
-  const hue = Math.abs(h) % 360;
-  return `hsl(${hue}, 60%, 58%)`;
 }
 
 interface Projection {
@@ -494,7 +450,7 @@ export default function MapView({ route, focusSystemId }: Props) {
       </div>
       <div className="card-body">
         {error && (
-          <div className="px-4 py-2 rounded-lg border border-red-300 bg-red-50 text-red-800 text-[13px]">
+          <div className="px-4 py-2 rounded-lg border border-[rgba(248,81,73,0.4)] bg-[rgba(248,81,73,0.10)] text-[var(--color-bad)] text-[13px]">
             {error}
           </div>
         )}

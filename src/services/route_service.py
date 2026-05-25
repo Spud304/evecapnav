@@ -47,9 +47,11 @@ class RouteService:
         self.graph: dict[int, list[tuple[int, float]]] = {}
         self.gate_graph: dict[int, list[tuple[int, bool, bool]]] = {}
         self.ship_classes: dict[str, ShipClass] = {}
+        self.instance_path: str = ""
 
     def initialize(self, app) -> None:
         """Load SDE data, build graphs, fetch ESI on startup if stale, load sov."""
+        self.instance_path = app.instance_path
         with app.app_context():
             logger.info("Loading systems from SDE...")
             self.systems.update(load_systems())
@@ -127,11 +129,11 @@ class RouteService:
 
         from src.clients.esi_client import (
             fetch_names_batch,
-            fetch_recent_activity,
             fetch_sovereignty,
             fetch_system_jumps,
             fetch_system_jumps_from_api,
             fetch_system_kills,
+            fetch_weekly_hourly_jumps,
         )
         from src.models.models import db
         from sqlalchemy import text
@@ -162,7 +164,7 @@ class RouteService:
                         api_url = os.environ.get(
                             "JUMP_API_URL", "http://localhost:8001"
                         )
-                        activity = fetch_recent_activity(api_url)
+                        activity = fetch_weekly_hourly_jumps(api_url)
                         if activity:
                             save_esi_activity(instance_path, activity)
                     sov = fetch_sovereignty()
@@ -253,6 +255,60 @@ class RouteService:
             }
             for label, sc in self.ship_classes.items()
         ]
+
+    def list_cap_ships_serialized(self) -> list[dict]:
+        """Per-type list of jump-capable cap ships for the typeahead picker."""
+        from src.stores.ship_store import load_cap_ship_types
+
+        return load_cap_ship_types(self.ship_classes)
+
+    @staticmethod
+    def compute_risk_score(steps: list, avoid_alliances: str) -> tuple[int, dict]:
+        """Aggregate per-route risk into a 0–100 score plus a breakdown.
+
+        Formula:
+            total_kills     = Σ step.kills_per_hour
+            peak_jumps      = Σ max(step.hourly_jumps)   (peak-hour traffic across the route)
+            dead_end_count  = Σ 1 where step.gate_count == 1
+            hostile_systems = Σ 1 where step.sov_owner in avoid_alliances (comma-split)
+
+            raw = 2.0 * total_kills + 0.05 * peak_jumps
+                  + 10 * dead_end_count + 15 * hostile_systems
+            risk = min(100, raw / max(1, len(steps)))
+
+        Per-hop normalization keeps long routes from auto-scoring high.
+        """
+        avoid_list = [
+            a.strip().lower() for a in (avoid_alliances or "").split(",") if a.strip()
+        ]
+        total_kills = sum(getattr(s, "kills_per_hour", 0) or 0 for s in steps)
+        peak_jumps = 0.0
+        for s in steps:
+            hourly = getattr(s, "hourly_jumps", None) or []
+            if hourly:
+                peak_jumps += max(hourly)
+        dead_end_count = sum(
+            1 for s in steps if (getattr(s, "gate_count", 0) or 0) == 1
+        )
+        hostile_systems = sum(
+            1
+            for s in steps
+            if (getattr(s, "sov_owner", "") or "").lower() in avoid_list
+        )
+        raw = (
+            2.0 * total_kills
+            + 0.05 * peak_jumps
+            + 10.0 * dead_end_count
+            + 15.0 * hostile_systems
+        )
+        n_hops = max(1, len(steps))
+        risk = min(100, int(round(raw / n_hops)))
+        return risk, {
+            "kills": int(total_kills),
+            "peak_jumps": int(round(peak_jumps)),
+            "dead_ends": dead_end_count,
+            "hostile_systems": hostile_systems,
+        }
 
     def plan_route(
         self, params: dict, intel_service, danger_data: dict
@@ -360,10 +416,12 @@ class RouteService:
         optimized_wait = 0.0
 
         yield ("progress", "Fetching threat intel...")
-        zkill_data, aggregate_hourly = intel_service.fetch_route_zkill(
-            [s.system_id for s in steps]
-        )
+        step_ids = [s.system_id for s in steps]
+        zkill_data, aggregate_hourly = intel_service.fetch_route_zkill(step_ids)
         quiet_start, quiet_end = intel_service.compute_quiet_hours(aggregate_hourly)
+        (jump_quiet_start, jump_quiet_end), jump_hourly = (
+            intel_service.compute_route_quiet_jumps(step_ids)
+        )
 
         eff_range = get_effective_range(sc.base_range_ly, jdc)
         route_ids = {s.system_id for s in steps}
@@ -374,9 +432,20 @@ class RouteService:
                 prev_id, route_ids, eff_range
             )
 
-        jump_data_source = os.environ.get("JUMP_DATA_SOURCE", "esi")
         jump_hops = sum(1 for s in steps if s.edge_type == "jump")
         gate_hops = sum(1 for s in steps if s.edge_type == "gate")
+        risk_score, risk_breakdown = self.compute_risk_score(steps, avoid_alliances)
+
+        # Convert fuel units → ISK using cached prices. Helium is the proxy
+        # isotope until per-race fuel accounting lands (B3 scope note).
+        from src.clients.esi_client import FUEL_TYPE_IDS  # noqa: F401 (id docs)
+        from src.stores.intel_cache_store import load_fuel_prices
+
+        prices = load_fuel_prices(self.instance_path)
+        HELIUM = 16274
+        unit_price = prices.get(HELIUM, 0.0)
+        total_fuel_isk = int(round(total_fuel * unit_price)) if unit_price > 0 else 0
+
         result_data: dict = {
             "steps": [s.to_dict() for s in steps],
             "total_jumps": jump_hops,
@@ -391,7 +460,14 @@ class RouteService:
                 "start": quiet_start,
                 "end": quiet_end,
             },
-            "jump_data_window": "24h" if jump_data_source == "fastapi" else "1h",
+            "quiet_jumps": {
+                "start": jump_quiet_start,
+                "end": jump_quiet_end,
+                "hourly": [round(v, 1) for v in jump_hourly],
+            },
+            "risk_score": risk_score,
+            "risk_breakdown": risk_breakdown,
+            "total_fuel_isk": total_fuel_isk,
         }
         if optimized_steps:
             result_data["optimized"] = {

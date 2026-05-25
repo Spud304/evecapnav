@@ -26,7 +26,7 @@ def test_zkill_empty_dict_does_not_open_modal(page: Page, base_url: str) -> None
     modal. This documents an FE branch that's currently lenient."""
     mock_route_response(page, result=two_hop_result(zkill={}))
     plan_origin_to_dest(page, base_url)
-    threat_cell = route_data_rows(page).nth(1).locator("td").nth(9)
+    threat_cell = route_data_rows(page).nth(1).locator('[data-testid="threat-cell"]')
     threat_cell.click()
     expect(page.get_by_text("Active PVPers", exact=True)).to_have_count(0)
 
@@ -45,18 +45,66 @@ def test_optimized_missing_hides_tab_strip(page: Page, base_url: str) -> None:
 
 
 def test_quiet_hours_null_renders_dash(page: Page, base_url: str) -> None:
-    mock_route_response(page, result=two_hop_result(quiet_hours=None))
+    """quiet_hours: null → Quietest · Kills cell renders '—'."""
+    mock_route_response(page, result=two_hop_result(quiet_hours=None, quiet_jumps=None))
     plan_origin_to_dest(page, base_url)
     summary = read_summary_card(page)
-    assert summary["Quietest Window"] == "—", summary
+    assert summary["Quietest · Kills"] == "—", summary
+    assert summary["Quietest · Jumps"] == "—", summary
 
 
-def test_jump_data_window_24h_renders_header_label(page: Page, base_url: str) -> None:
-    """The Jumps column header reads `Jumps/24h` instead of `Jumps/h` when the
-    backend declares 24h data."""
-    mock_route_response(page, result=two_hop_result(jump_data_window="24h"))
+def test_hour_of_day_column_header_renders(page: Page, base_url: str) -> None:
+    """The Hour-of-day sparkline column replaced the old Jumps/h column."""
+    mock_route_response(page, result=two_hop_result())
     plan_origin_to_dest(page, base_url)
-    expect(page.get_by_text("Jumps/24h", exact=False)).to_be_visible()
+    expect(page.get_by_text("Hour-of-day", exact=False)).to_be_visible()
+
+
+def test_missing_hourly_jumps_renders_no_data(page: Page, base_url: str) -> None:
+    """Sparkline falls back to 'no data' span when hourly_jumps is empty."""
+    mock_route_response(page, result=two_hop_result())  # default: hourly_jumps=[]
+    plan_origin_to_dest(page, base_url)
+    expect(page.get_by_test_id("sparkline-empty").first).to_be_visible()
+
+
+def test_hourly_jumps_present_renders_sparkline(page: Page, base_url: str) -> None:
+    """A populated 24-element hourly_jumps array renders the Sparkline div."""
+    result = two_hop_result()
+    sample = [
+        80,
+        75,
+        70,
+        65,
+        60,
+        55,
+        60,
+        80,
+        110,
+        140,
+        160,
+        180,
+        200,
+        220,
+        230,
+        220,
+        200,
+        180,
+        160,
+        140,
+        120,
+        100,
+        90,
+        85,
+    ]
+    for step in result["steps"]:
+        step["hourly_jumps"] = sample
+    mock_route_response(page, result=result)
+    plan_origin_to_dest(page, base_url)
+    # Both rows render a sparkline (origin + destination).
+    expect(page.get_by_test_id("sparkline")).to_have_count(2)
+    # Annotation row shows Peak/Quiet/Now labels (Variant A).
+    expect(page.get_by_text("Peak", exact=False).first).to_be_visible()
+    expect(page.get_by_text("Quiet", exact=False).first).to_be_visible()
 
 
 def test_edge_type_jump_omits_gate_pill(page: Page, base_url: str) -> None:
@@ -93,7 +141,6 @@ def test_zero_total_jumps_with_empty_steps_hides_summary(
             "alternatives": {},
             "zkill": {},
             "quiet_hours": None,
-            "jump_data_window": "1h",
         },
     )
     page.goto(base_url)

@@ -161,6 +161,66 @@ class TestFindRoute:
         assert len(steps) > 0
         assert steps[-1].system_id == 3
 
+    def test_hourly_jumps_propagated_to_route_step(self):
+        """When danger_data carries a per-system hourly_jumps profile, the
+        emitted RouteStep should expose it on the wire as a 24-element list.
+        This is what feeds the per-step sparkline in the frontend."""
+        sample = [10.0] * 12 + [50.0] * 12  # afternoon-peak EU pattern
+        danger = {3: {"ship_kills": 0, "ship_jumps": 720, "hourly_jumps": sample}}
+        steps = find_route(
+            origin_id=1,
+            dest_id=3,
+            systems=self._make_systems(),
+            graph=self._make_graph(),
+            base_range_ly=10.0,
+            jdc_level=5,
+            fatigue_multiplier=1.0,
+            fuel_per_ly=1000,
+            danger_data=danger,
+        )
+        dest_step = next(s for s in steps if s.system_id == 3)
+        assert dest_step.hourly_jumps == sample
+        assert len(dest_step.to_dict()["hourly_jumps"]) == 24
+
+    def test_wait_split_sums_to_wait_minutes(self):
+        """Each RouteStep's wait_cooldown_minutes + wait_decay_minutes must
+        equal wait_minutes within rounding tolerance. This guards against
+        the search emitting a breakdown that doesn't account for all the
+        time the user is actually waiting."""
+        steps = find_route(
+            origin_id=1,
+            dest_id=3,
+            systems=self._make_systems(),
+            graph=self._make_graph(),
+            base_range_ly=10.0,
+            jdc_level=5,
+            fatigue_multiplier=1.0,
+            fuel_per_ly=1000,
+        )
+        for s in steps:
+            split = (s.wait_cooldown_minutes or 0) + (s.wait_decay_minutes or 0)
+            assert abs(split - s.wait_minutes) <= 0.2, (
+                f"Wait breakdown mismatch on {s.system_name}: "
+                f"cooldown={s.wait_cooldown_minutes} + decay={s.wait_decay_minutes} "
+                f"!= wait_minutes={s.wait_minutes}"
+            )
+
+    def test_hourly_jumps_defaults_to_empty(self):
+        """Systems without hourly_jumps in danger_data should emit an empty list,
+        not raise. The Sparkline frontend treats empty as 'no data'."""
+        steps = find_route(
+            origin_id=1,
+            dest_id=3,
+            systems=self._make_systems(),
+            graph=self._make_graph(),
+            base_range_ly=10.0,
+            jdc_level=5,
+            fatigue_multiplier=1.0,
+            fuel_per_ly=1000,
+        )
+        for s in steps:
+            assert s.hourly_jumps == []
+
 
 class TestRegionalGates:
     """Tests for the optional stargate-hop routing."""
