@@ -117,9 +117,9 @@ class TestFuelPrices:
             responses.GET,
             f"{ESI_BASE_URL}/markets/prices/",
             json=[
-                {"type_id": 16274, "average_price": 1500.0},   # Helium — kept
-                {"type_id": 17889, "average_price": 1300.0},   # Hydrogen — kept
-                {"type_id": 34, "average_price": 5.0},         # Tritanium — dropped
+                {"type_id": 16274, "average_price": 1500.0},  # Helium — kept
+                {"type_id": 17889, "average_price": 1300.0},  # Hydrogen — kept
+                {"type_id": 34, "average_price": 5.0},  # Tritanium — dropped
             ],
             status=200,
         )

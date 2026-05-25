@@ -56,9 +56,7 @@ def test_summary_card_arrival_time_renders_when_wait_positive(
     from playwright.sync_api import expect
 
     # Freeze the page's clock to 2026-05-20T12:00:00Z so arrival = noon + wait.
-    page.add_init_script(
-        "Date.now = () => new Date('2026-05-20T12:00:00Z').getTime();"
-    )
+    page.add_init_script("Date.now = () => new Date('2026-05-20T12:00:00Z').getTime();")
     reseed("empty")
     plan_origin_to_dest(page, base_url)
     badge = page.get_by_test_id("arrival-time")
@@ -74,18 +72,14 @@ def test_summary_card_quiet_hours_dash_when_missing(
 ) -> None:
     """quiet_hours: null and quiet_jumps: null → both cells render '—'."""
     reseed("empty")
-    mock_route_response(
-        page, result=two_hop_result(quiet_hours=None, quiet_jumps=None)
-    )
+    mock_route_response(page, result=two_hop_result(quiet_hours=None, quiet_jumps=None))
     plan_origin_to_dest(page, base_url)
     summary = read_summary_card(page)
     assert summary["Quietest · Jumps"] == "—"
     assert summary["Quietest · Kills"] == "—"
 
 
-def test_summary_card_renders_risk_score(
-    page: Page, base_url: str, reseed
-) -> None:
+def test_summary_card_renders_risk_score(page: Page, base_url: str, reseed) -> None:
     """Risk cell renders a 0–100% value and carries a `data-risk-band` band
     attribute that drives the green/amber/red coloring."""
     from playwright.sync_api import expect

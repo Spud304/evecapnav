@@ -113,9 +113,7 @@ def fetch_weekly_hourly_jumps(api_url: str) -> dict[int, dict]:
 
         result: dict[int, dict] = {}
         for sid, bucket in sums.items():
-            hourly = [
-                bucket[h] / counts[h] if counts[h] else 0.0 for h in range(24)
-            ]
+            hourly = [bucket[h] / counts[h] if counts[h] else 0.0 for h in range(24)]
             mean = sum(hourly) / 24
             result[sid] = {
                 "pilot_activity": int(round(mean)),

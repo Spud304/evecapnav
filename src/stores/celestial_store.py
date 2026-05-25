@@ -60,7 +60,12 @@ def load_celestials() -> dict[int, list[Celestial]]:
         )
 
     for b in db.session.query(MapAsteroidBelt).all():
-        if b.solarSystemID is None or not b.positionX or not b.positionY or not b.positionZ:
+        if (
+            b.solarSystemID is None
+            or not b.positionX
+            or not b.positionY
+            or not b.positionZ
+        ):
             continue
         # mapAsteroidBelt mirrors mapMoon's structure: celestialIndex is the
         # parent planet (II, III, …) and orbitIndex is the belt number around

@@ -26,9 +26,7 @@ def test_zkill_empty_dict_does_not_open_modal(page: Page, base_url: str) -> None
     modal. This documents an FE branch that's currently lenient."""
     mock_route_response(page, result=two_hop_result(zkill={}))
     plan_origin_to_dest(page, base_url)
-    threat_cell = (
-        route_data_rows(page).nth(1).locator('[data-testid="threat-cell"]')
-    )
+    threat_cell = route_data_rows(page).nth(1).locator('[data-testid="threat-cell"]')
     threat_cell.click()
     expect(page.get_by_text("Active PVPers", exact=True)).to_have_count(0)
 
@@ -48,9 +46,7 @@ def test_optimized_missing_hides_tab_strip(page: Page, base_url: str) -> None:
 
 def test_quiet_hours_null_renders_dash(page: Page, base_url: str) -> None:
     """quiet_hours: null → Quietest · Kills cell renders '—'."""
-    mock_route_response(
-        page, result=two_hop_result(quiet_hours=None, quiet_jumps=None)
-    )
+    mock_route_response(page, result=two_hop_result(quiet_hours=None, quiet_jumps=None))
     plan_origin_to_dest(page, base_url)
     summary = read_summary_card(page)
     assert summary["Quietest · Kills"] == "—", summary
@@ -75,8 +71,30 @@ def test_hourly_jumps_present_renders_sparkline(page: Page, base_url: str) -> No
     """A populated 24-element hourly_jumps array renders the Sparkline div."""
     result = two_hop_result()
     sample = [
-        80, 75, 70, 65, 60, 55, 60, 80, 110, 140, 160, 180,
-        200, 220, 230, 220, 200, 180, 160, 140, 120, 100, 90, 85,
+        80,
+        75,
+        70,
+        65,
+        60,
+        55,
+        60,
+        80,
+        110,
+        140,
+        160,
+        180,
+        200,
+        220,
+        230,
+        220,
+        200,
+        180,
+        160,
+        140,
+        120,
+        100,
+        90,
+        85,
     ]
     for step in result["steps"]:
         step["hourly_jumps"] = sample

@@ -9,6 +9,7 @@ from dataclasses import dataclass
 class _Step:
     """Minimal step-shape stand-in. compute_risk_score uses getattr so we
     don't need to import the real RouteStep dataclass."""
+
     kills_per_hour: int = 0
     hourly_jumps: list | None = None
     gate_count: int = 5
@@ -63,8 +64,13 @@ class TestRiskScore:
         assert breakdown["dead_ends"] == 1
 
     def test_hostile_sov_matches_avoid_list_case_insensitively(self):
-        steps = [_Step(sov_owner="Goonswarm Federation"), _Step(sov_owner="Pandemic Horde")]
-        score, breakdown = _compute(steps, avoid_alliances="goonswarm federation, brave")
+        steps = [
+            _Step(sov_owner="Goonswarm Federation"),
+            _Step(sov_owner="Pandemic Horde"),
+        ]
+        score, breakdown = _compute(
+            steps, avoid_alliances="goonswarm federation, brave"
+        )
         # 1 hostile system * 15 / 2 hops = 7 (rounded).
         assert breakdown["hostile_systems"] == 1
         assert score == 8 or score == 7  # round-half tolerance

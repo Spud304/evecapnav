@@ -304,9 +304,7 @@ def load_fuel_prices(instance_path: str) -> dict[int, float]:
     _init_cache_db(path)
     conn = sqlite3.connect(path)
     try:
-        rows = conn.execute(
-            "SELECT type_id, avg_price FROM fuel_prices"
-        ).fetchall()
+        rows = conn.execute("SELECT type_id, avg_price FROM fuel_prices").fetchall()
     except sqlite3.OperationalError:
         return {}
     finally:

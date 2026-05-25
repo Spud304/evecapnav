@@ -58,9 +58,7 @@ def test_clear_saved_button_wipes_persistence(page: Page, base_url: str) -> None
     expect(page.get_by_test_id("ship-picker-input")).to_have_value("Archon")
 
 
-def test_localStorage_corruption_does_not_crash_form(
-    page: Page, base_url: str
-) -> None:
+def test_localStorage_corruption_does_not_crash_form(page: Page, base_url: str) -> None:
     """If a user manually wrote garbage into evecapnav.prefs, loadPrefs()
     should swallow the JSON.parse error and return an empty object so the
     form still renders."""

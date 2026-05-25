@@ -167,9 +167,7 @@ def test_initial_fatigue_invalid_input_blocks_plan(
     expect(page.get_by_text("Total Hops", exact=True)).to_have_count(0)
 
 
-def test_route_preference_slider_renders_tick_marks(
-    page: Page, base_url: str
-) -> None:
+def test_route_preference_slider_renders_tick_marks(page: Page, base_url: str) -> None:
     """The slider has a `<datalist>` with three labeled stops (Quickest /
     Balanced / Least jumps). Browsers render small tick marks at the
     datalist option positions."""

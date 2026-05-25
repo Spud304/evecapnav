@@ -22,6 +22,7 @@ def _isolate_instance_path(tmp_path_factory):
         else:
             os.environ["EVECAPNAV_INSTANCE_PATH"] = previous
 
+
 from src.application import Application
 from src.celery_app import celery_init_app
 from src.models.models import (

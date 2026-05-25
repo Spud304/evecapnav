@@ -133,7 +133,9 @@ def set_ship(page: Page, ship_name: str) -> None:
     inp = page.get_by_test_id("ship-picker-input")
     inp.fill("")
     inp.type(ship_name, delay=20)
-    option = page.locator(f'[data-testid="ship-picker-option"][data-ship-name="{ship_name}"]').first
+    option = page.locator(
+        f'[data-testid="ship-picker-option"][data-ship-name="{ship_name}"]'
+    ).first
     option.wait_for(state="visible")
     option.click()
     expect(inp).to_have_value(ship_name)

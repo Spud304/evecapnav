@@ -59,9 +59,7 @@ def test_sec_band_pill_renders_NS_for_null_sec(
         assert pills.nth(i).get_attribute("data-sec-band") == "NS"
 
 
-def test_sec_band_pill_renders_LS_HS_from_mock(
-    page: Page, base_url: str
-) -> None:
+def test_sec_band_pill_renders_LS_HS_from_mock(page: Page, base_url: str) -> None:
     """Mock a route with low-sec and hi-sec steps to exercise the LS/HS
     branches of the secBand() function. The hi-sec pill is intentionally
     rendered with a hard-red warning palette (capital ships can't gate-jump
@@ -107,9 +105,7 @@ def test_safe_au_subtext_renders_warp_and_nearest(
     assert "warp" in title or "near" in title, title
 
 
-def test_moons_column_hidden_in_safe_mode(
-    page: Page, base_url: str, reseed
-) -> None:
+def test_moons_column_hidden_in_safe_mode(page: Page, base_url: str, reseed) -> None:
     """In safe (default) routing mode the Moons column is hidden — pilots
     don't care about moon count unless they're POS-hopping."""
     from playwright.sync_api import expect
@@ -193,9 +189,7 @@ def test_wait_cell_renders_two_tone_bar_when_breakdown_present(
     assert dc_w.startswith("83") or dc_w.startswith("84"), dc_w
 
 
-def test_wait_cell_no_bar_when_breakdown_zero(
-    page: Page, base_url: str
-) -> None:
+def test_wait_cell_no_bar_when_breakdown_zero(page: Page, base_url: str) -> None:
     """No bar should render when both cooldown and decay are zero (e.g. on
     a gate hop or origin row). Just the time text."""
     from tests.integration.helpers import mock_route_response, two_hop_result
@@ -265,9 +259,7 @@ def test_row_carries_sov_color_for_known_alliance(
     assert brave.get_attribute("data-sov-color") == "#a26ad8"
 
 
-def test_moons_column_visible_in_pos_mode(
-    page: Page, base_url: str, reseed
-) -> None:
+def test_moons_column_visible_in_pos_mode(page: Page, base_url: str, reseed) -> None:
     """POS-hopping mode brings the Moons column back."""
     from playwright.sync_api import expect
     from tests.integration.helpers import (

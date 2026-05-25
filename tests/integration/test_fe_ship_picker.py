@@ -54,9 +54,7 @@ def test_picker_click_commits_selection(page: Page, base_url: str) -> None:
     inp.click()
     inp.fill("")
     inp.type("Rhe", delay=20)
-    page.locator(
-        '[data-testid="ship-picker-option"][data-ship-name="Rhea"]'
-    ).click()
+    page.locator('[data-testid="ship-picker-option"][data-ship-name="Rhea"]').click()
     expect(inp).to_have_value("Rhea")
     # Picking a JF reveals the JF skill field.
     expect(page.get_by_text("JF skill", exact=True)).to_be_visible()

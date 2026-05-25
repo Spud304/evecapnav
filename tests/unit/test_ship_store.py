@@ -13,8 +13,12 @@ class TestLoadShipClasses:
         with app.app_context():
             classes = load_ship_classes()
 
-        merged = [label for label in classes if "Carrier" in label and "Dreadnought" in label]
-        assert merged, f"expected a merged Carrier/Dreadnought label, got: {list(classes)}"
+        merged = [
+            label for label in classes if "Carrier" in label and "Dreadnought" in label
+        ]
+        assert merged, (
+            f"expected a merged Carrier/Dreadnought label, got: {list(classes)}"
+        )
 
     def test_jump_freighter_is_separate_class(self, app):
         from src.stores.ship_store import load_ship_classes

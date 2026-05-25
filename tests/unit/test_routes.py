@@ -43,7 +43,13 @@ class TestCapShips:
         resp = client.get("/api/cap-ships")
         data = resp.get_json()
         for entry in data:
-            for key in ("type_id", "type_name", "group_id", "class_label", "base_range_ly"):
+            for key in (
+                "type_id",
+                "type_name",
+                "group_id",
+                "class_label",
+                "base_range_ly",
+            ):
                 assert key in entry, f"missing {key!r} in {entry}"
 
 
@@ -114,7 +120,6 @@ class TestPlanRoute:
         for key in ("kills", "peak_jumps", "dead_ends", "hostile_systems"):
             assert key in breakdown
 
-
     def test_result_includes_quiet_jumps_and_hourly_per_step(self, client, app):
         """Wire-shape regression: /api/route must include the new quiet_jumps
         field (route-aggregated weekly quietest window) and every RouteStep
@@ -126,9 +131,7 @@ class TestPlanRoute:
             f"&ship_class={ship_class}&jdc_level=5"
         )
         events = _parse_sse_events(resp.data)
-        result = json.loads(
-            next(e for e in events if e[0] == "result")[1]
-        )
+        result = json.loads(next(e for e in events if e[0] == "result")[1])
         # Route-level summary
         assert "quiet_jumps" in result
         qj = result["quiet_jumps"]
