@@ -210,12 +210,26 @@ class RouteService:
         except OSError:
             logger.info("Another process is fetching ESI data, skipping")
 
+    def lowsec_exclusions(self, allowed_ids: set[int]) -> set[int]:
+        """System IDs to exclude when routing with avoid_lowsec.
+
+        Low-sec = stored sec >= 0.0 (the systems dict only holds sec < 0.5,
+        so everything non-negative here is low-sec). `allowed_ids` carve out
+        the route endpoints so low-sec staging systems still route.
+        """
+        return {
+            sid
+            for sid, s in self.systems.items()
+            if s.security >= 0.0 and sid not in allowed_ids
+        }
+
     def find_alternatives(
         self,
         prev_id: int,
         route_ids: set[int],
         eff_range: float,
         limit: int = 10,
+        avoid_lowsec: bool = False,
     ) -> list[dict]:
         """Find candidate systems reachable from prev_id by JD at the
         given effective range, excluding any system already on the route.
@@ -229,6 +243,8 @@ class RouteService:
                 continue
             ns = self.systems.get(neighbor_id)
             if not ns:
+                continue
+            if avoid_lowsec and ns.security >= 0.0:
                 continue
             alts.append(
                 {
@@ -327,6 +343,7 @@ class RouteService:
         jfc_level = params["jfc_level"]
         mode = params["mode"]
         avoid_alliances = params["avoid_alliances"]
+        avoid_lowsec = params["avoid_lowsec"]
         base_system_cost = params["base_system_cost"]
         distance_exponent = params["distance_exponent"]
         danger_weight = params["danger_weight"]
@@ -369,6 +386,10 @@ class RouteService:
 
         yield ("progress", "Searching for route...")
 
+        excluded = (
+            self.lowsec_exclusions({origin_id, dest_id}) if avoid_lowsec else None
+        )
+
         steps = find_route(
             origin_id=origin_id,
             dest_id=dest_id,
@@ -384,6 +405,7 @@ class RouteService:
             on_progress=on_progress_collect,
             mode=mode,
             avoid_alliances=avoid_alliances if avoid_alliances else None,
+            exclude_systems=excluded,
             base_system_cost=base_system_cost,
             distance_exponent=distance_exponent,
             danger_weight=danger_weight,
@@ -429,7 +451,7 @@ class RouteService:
         for idx in range(1, len(steps)):
             prev_id = steps[idx - 1].system_id
             alternatives[str(steps[idx].system_id)] = self.find_alternatives(
-                prev_id, route_ids, eff_range
+                prev_id, route_ids, eff_range, avoid_lowsec=avoid_lowsec
             )
 
         jump_hops = sum(1 for s in steps if s.edge_type == "jump")
@@ -492,6 +514,7 @@ class RouteService:
         jfc_level = params["jfc_level"]
         initial_fatigue = params["initial_fatigue"]
         mode = params["mode"]
+        avoid_lowsec = params["avoid_lowsec"]
         base_system_cost = params["base_system_cost"]
         distance_exponent = params["distance_exponent"]
         danger_weight = params["danger_weight"]
@@ -523,6 +546,10 @@ class RouteService:
         replaced_id = current_path[hop_index]
         dest_id = current_path[-1]
 
+        excluded = {replaced_id}
+        if avoid_lowsec:
+            excluded |= self.lowsec_exclusions({alt_system_id, dest_id})
+
         suffix_steps = find_route(
             origin_id=alt_system_id,
             dest_id=dest_id,
@@ -534,7 +561,7 @@ class RouteService:
             fuel_per_ly=sc.fuel_per_ly,
             danger_data=danger_data,
             mode=mode,
-            exclude_systems={replaced_id},
+            exclude_systems=excluded,
             base_system_cost=base_system_cost,
             distance_exponent=distance_exponent,
             danger_weight=danger_weight,
@@ -570,7 +597,7 @@ class RouteService:
         for idx in range(1, len(steps)):
             prev_id = steps[idx - 1].system_id
             alternatives[str(steps[idx].system_id)] = self.find_alternatives(
-                prev_id, route_ids, eff_range
+                prev_id, route_ids, eff_range, avoid_lowsec=avoid_lowsec
             )
 
         return {

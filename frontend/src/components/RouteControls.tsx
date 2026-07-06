@@ -42,6 +42,7 @@ export interface RouteParams {
   jf_skill: number;
   initial_fatigue: number;
   mode: string;
+  avoid_lowsec: boolean;
   base_system_cost: number;
   distance_exponent: number;
   danger_weight: number;
@@ -86,6 +87,7 @@ export default function RouteControls({ onResult, onError, onProgress, onSystemF
   );
   const [jfSkill, setJfSkill] = useState(initialPrefs.jfSkill ?? 4);
   const [avoidAlliances, setAvoidAlliances] = useState('');
+  const [avoidLowsec, setAvoidLowsec] = useState(initialPrefs.avoidLowsec ?? false);
   const [loading, setLoading] = useState(false);
   const esRef = useRef<EventSource | null>(null);
 
@@ -132,11 +134,12 @@ export default function RouteControls({ onResult, onError, onProgress, onSystemF
         initialFatigue: fatigue,
         mode,
         gateMode,
+        avoidLowsec,
         waitWeight,
       });
     }, 500);
     return () => clearTimeout(handle);
-  }, [originId, destId, shipName, shipClass, jdc, jfc, jfSkill, fatigue, mode, gateMode, waitWeight]);
+  }, [originId, destId, shipName, shipClass, jdc, jfc, jfSkill, fatigue, mode, gateMode, avoidLowsec, waitWeight]);
 
   function handleResetAll() {
     clearPrefs();
@@ -151,6 +154,7 @@ export default function RouteControls({ onResult, onError, onProgress, onSystemF
     setMode('safe');
     setGateMode('off');
     setAvoidAlliances('');
+    setAvoidLowsec(false);
     setWaitWeight(DEFAULT_WEIGHTS.wait_weight);
     setBaseSystemCost(DEFAULT_WEIGHTS.base_system_cost);
     setDistanceExponent(DEFAULT_WEIGHTS.distance_exponent);
@@ -192,6 +196,7 @@ export default function RouteControls({ onResult, onError, onProgress, onSystemF
       initial_fatigue: fatigue,
       mode,
       avoid_alliances: avoidAlliances,
+      avoid_lowsec: avoidLowsec,
       gate_mode: gateMode,
       gate_equivalent_jumps: gateEquivalentJumps,
       base_system_cost: baseSystemCost,
@@ -212,7 +217,11 @@ export default function RouteControls({ onResult, onError, onProgress, onSystemF
           setLoading(false);
           if (result.error && !result.steps?.length) {
             const isNoRoute = /no route/i.test(result.error);
-            if (isNoRoute && gateMode === 'off') {
+            if (isNoRoute && avoidLowsec) {
+              onError(
+                'No route found with low-sec avoidance on. Try allowing low-sec systems, enabling stargate hops, or a longer-range ship class.',
+              );
+            } else if (isNoRoute && gateMode === 'off') {
               onError(
                 'No route found at this ship’s jump range. Try enabling stargate hops, or use a longer-range ship class.',
               );
@@ -235,6 +244,7 @@ export default function RouteControls({ onResult, onError, onProgress, onSystemF
               jf_skill: jfSkill,
               initial_fatigue: fatigue,
               mode,
+              avoid_lowsec: avoidLowsec,
               base_system_cost: baseSystemCost,
               distance_exponent: distanceExponent,
               danger_weight: dangerWeight,
@@ -396,6 +406,21 @@ export default function RouteControls({ onResult, onError, onProgress, onSystemF
               placeholder="Goonswarm Federation, Pandemic Horde, ..."
               className="input"
             />
+          </div>
+          <div className="flex flex-col">
+            <label className="field-label">Low-sec systems</label>
+            <label className="flex items-center gap-2 min-h-[34px] cursor-pointer text-[13px]">
+              <input
+                type="checkbox"
+                checked={avoidLowsec}
+                onChange={(e) => setAvoidLowsec(e.target.checked)}
+                data-testid="avoid-lowsec-toggle"
+              />
+              <span>Avoid low-sec</span>
+            </label>
+            <span className="text-[11px] text-[var(--color-muted)] mt-[3px]">
+              Route through null-sec only. Origin and destination are always allowed.
+            </span>
           </div>
           <div className="flex flex-col">
             <label className="field-label">Stargate hops</label>

@@ -21,6 +21,7 @@ export interface RoutePrefs {
   initialFatigue?: number;
   mode?: 'safe' | 'direct' | 'pos';
   gateMode?: 'off' | 'interregional' | 'all';
+  avoidLowsec?: boolean;
   waitWeight?: number;
 }
 

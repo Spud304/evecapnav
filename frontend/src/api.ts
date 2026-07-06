@@ -30,6 +30,7 @@ export function planRouteSSE(
     initial_fatigue: number;
     mode: 'safe' | 'direct' | 'pos';
     avoid_alliances: string;
+    avoid_lowsec: boolean;
     base_system_cost: number;
     distance_exponent: number;
     danger_weight: number;
@@ -56,6 +57,7 @@ export function planRouteSSE(
     initial_fatigue: String(params.initial_fatigue),
     mode: params.mode,
     avoid_alliances: params.avoid_alliances,
+    avoid_lowsec: params.avoid_lowsec ? '1' : '0',
     base_system_cost: String(params.base_system_cost),
     distance_exponent: String(params.distance_exponent),
     danger_weight: String(params.danger_weight),
@@ -101,6 +103,7 @@ export async function swapHop(params: {
   jfc_level: number;
   initial_fatigue: number;
   mode: string;
+  avoid_lowsec: boolean;
   base_system_cost: number;
   distance_exponent: number;
   danger_weight: number;
@@ -119,6 +122,7 @@ export async function swapHop(params: {
     jfc_level: String(params.jfc_level),
     initial_fatigue: String(params.initial_fatigue),
     mode: params.mode,
+    avoid_lowsec: params.avoid_lowsec ? '1' : '0',
     base_system_cost: String(params.base_system_cost),
     distance_exponent: String(params.distance_exponent),
     danger_weight: String(params.danger_weight),
