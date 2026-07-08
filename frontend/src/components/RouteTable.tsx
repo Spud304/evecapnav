@@ -165,19 +165,27 @@ export default function RouteTable({
                       )}
                     </td>
                     <td className={TD}>
-                      <div className="font-semibold text-[var(--color-ink)]">
-                        {step.system_name}
+                      <div className="font-semibold text-[var(--color-ink)] flex items-center gap-1.5">
+                        <span
+                          className="truncate max-w-[180px]"
+                          title={step.system_name}
+                        >
+                          {step.system_name}
+                        </span>
                         {step.edge_type === 'gate' && (
-                          <span className="pill ml-1.5" style={{ background: 'rgba(88,166,255,0.18)', borderColor: 'rgba(88,166,255,0.40)', color: '#79b8ff' }}>
+                          <span className="pill shrink-0" style={{ background: 'rgba(88,166,255,0.18)', borderColor: 'rgba(88,166,255,0.40)', color: '#79b8ff' }}>
                             Gate
                           </span>
                         )}
                         {step.gate_count === 1 && (
-                          <span className="pill ml-1.5">Dead End</span>
+                          <span className="pill shrink-0">Dead End</span>
                         )}
                       </div>
                       {step.sov_owner && (
-                        <div className="text-[11px] text-[var(--color-muted)]">
+                        <div
+                          className="text-[11px] text-[var(--color-muted)] truncate max-w-[240px]"
+                          title={step.sov_owner}
+                        >
                           {step.sov_owner}
                         </div>
                       )}
@@ -297,7 +305,7 @@ export default function RouteTable({
                       )}
                     </td>
                     <td
-                      className={`${TD} text-right max-w-[170px]`}
+                      className={`${TD} text-right`}
                       title={[
                         step.safe_spot_warp ? `warp ${step.safe_spot_warp}` : '',
                         step.safe_spot_nearest ? `near ${step.safe_spot_nearest}` : '',
@@ -305,28 +313,33 @@ export default function RouteTable({
                         .filter(Boolean)
                         .join(' · ')}
                     >
-                      <span
-                        className="font-semibold tabular-nums"
-                        style={{ color: safeColor(step.safe_spot_au) }}
-                      >
-                        {step.safe_spot_au.toFixed(1)}
-                      </span>
-                      {step.safe_spot_warp && (
+                      {/* Fixed-width inner block: max-width on a td is ignored
+                          in auto table layout, so `truncate` on the spans only
+                          works with a real width constraint here. */}
+                      <div className="w-[170px] ml-auto">
                         <span
-                          className="block text-[10.5px] text-[var(--color-muted)] font-normal truncate"
-                          title={`warp ${step.safe_spot_warp}`}
+                          className="font-semibold tabular-nums"
+                          style={{ color: safeColor(step.safe_spot_au) }}
                         >
-                          warp {step.safe_spot_warp}
+                          {step.safe_spot_au.toFixed(1)}
                         </span>
-                      )}
-                      {step.safe_spot_nearest && (
-                        <span
-                          className="block text-[10.5px] text-[var(--color-muted)] font-normal truncate"
-                          title={`near ${step.safe_spot_nearest}`}
-                        >
-                          near {step.safe_spot_nearest}
-                        </span>
-                      )}
+                        {step.safe_spot_warp && (
+                          <span
+                            className="block text-[10.5px] text-[var(--color-muted)] font-normal truncate"
+                            title={`warp ${step.safe_spot_warp}`}
+                          >
+                            warp {step.safe_spot_warp}
+                          </span>
+                        )}
+                        {step.safe_spot_nearest && (
+                          <span
+                            className="block text-[10.5px] text-[var(--color-muted)] font-normal truncate"
+                            title={`near ${step.safe_spot_nearest}`}
+                          >
+                            near {step.safe_spot_nearest}
+                          </span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                   {isExpanded && alts.length > 0 && (

@@ -111,7 +111,7 @@ export default function App() {
   return (
     <>
       <header className="bg-[var(--color-paper)] border-b border-[var(--color-line)]">
-        <div className="max-w-[1080px] mx-auto px-[22px] py-[14px] flex items-baseline gap-5">
+        <div className="max-w-[1500px] mx-auto px-[22px] py-[14px] flex items-baseline gap-5">
           <h1 className="m-0 text-[18px] font-semibold tracking-tight">
             <span className="inline-block w-2 h-2 rounded-full bg-[var(--color-accent)] mr-2 align-middle translate-y-[-1px]" />
             EVE CapNav
@@ -122,7 +122,7 @@ export default function App() {
         </div>
       </header>
 
-      <div className="max-w-[1080px] mx-auto px-[22px] py-5 pb-10">
+      <div className="max-w-[1500px] mx-auto px-[22px] py-5 pb-10">
         <RouteControls
           onResult={handleResult}
           onError={handleError}
