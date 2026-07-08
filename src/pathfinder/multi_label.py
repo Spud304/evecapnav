@@ -327,14 +327,22 @@ def _reconstruct_route(
             continue
 
         # Look ahead: accumulate consecutive wait pseudo-edges at the same system.
+        # Track cooldown vs fatigue-decay waits separately for the two-tone
+        # Wait cell in the frontend (red timer vs blue timer).
         j = i + 1
         wait_after = 0.0
+        wait_cooldown = 0.0
+        wait_decay = 0.0
         while (
             j < len(chain)
             and (chain[j].jump_type & (JT_FATIGUE_WAIT | JT_COOLDOWN_WAIT)) != 0
         ):
             delta_min = (chain[j].time_seconds - chain[j - 1].time_seconds) / 60.0
             wait_after += delta_min
+            if (chain[j].jump_type & JT_COOLDOWN_WAIT) != 0:
+                wait_cooldown += delta_min
+            else:
+                wait_decay += delta_min
             j += 1
 
         sys = systems[vx.sys_id]
@@ -372,6 +380,8 @@ def _reconstruct_route(
             if j == i + 1 and vx.est_cooldown_min > 0:
                 inbound_cooldown = vx.est_cooldown_min
             wait_min = wait_after + inbound_cooldown
+            # The synthesized inbound cooldown counts as a red-timer wait.
+            wait_cooldown += inbound_cooldown
             distance_ly = vx.distance_ly
             edge_type_out = "jump"
             fuel = vx.fuel_cost
@@ -400,6 +410,9 @@ def _reconstruct_route(
                 gate_count=sys.gate_count,
                 sov_owner=sys.sov_alliance_name or sys.sov_faction_name,
                 edge_type=edge_type_out,
+                hourly_jumps=list(sys_danger.get("hourly_jumps", [])),
+                wait_cooldown_minutes=round(wait_cooldown, 1),
+                wait_decay_minutes=round(wait_decay, 1),
             )
         )
         i = j

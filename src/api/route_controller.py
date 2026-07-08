@@ -37,6 +37,7 @@ def plan_route():
     gate_mode = request.args.get("gate_mode", "off")
     if gate_mode not in ("off", "interregional", "all"):
         gate_mode = "off"
+    avoid_lowsec = request.args.get("avoid_lowsec", "0").lower() in ("1", "true")
 
     params = {
         "origin_id": request.args.get("origin_id", type=int),
@@ -47,6 +48,7 @@ def plan_route():
         "jfc_level": request.args.get("jfc_level", 0, type=int),
         "mode": request.args.get("mode", "safe"),
         "avoid_alliances": avoid_alliances,
+        "avoid_lowsec": avoid_lowsec,
         "base_system_cost": request.args.get(
             "base_system_cost", BASE_SYSTEM_COST, type=int
         ),
@@ -106,6 +108,7 @@ def swap_hop():
         "jfc_level": request.args.get("jfc_level", 0, type=int),
         "initial_fatigue": request.args.get("initial_fatigue", 0.0, type=float),
         "mode": request.args.get("mode", "safe"),
+        "avoid_lowsec": request.args.get("avoid_lowsec", "0").lower() in ("1", "true"),
         "base_system_cost": request.args.get(
             "base_system_cost", BASE_SYSTEM_COST, type=int
         ),

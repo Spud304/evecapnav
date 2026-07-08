@@ -60,12 +60,26 @@ def load_celestials() -> dict[int, list[Celestial]]:
         )
 
     for b in db.session.query(MapAsteroidBelt).all():
-        if b.solarSystemID is not None and b.positionX and b.positionY and b.positionZ:
-            _ensure(b.solarSystemID).append(
-                Celestial(
-                    "Belt", float(b.positionX), float(b.positionY), float(b.positionZ)
-                )
-            )
+        if (
+            b.solarSystemID is None
+            or not b.positionX
+            or not b.positionY
+            or not b.positionZ
+        ):
+            continue
+        # mapAsteroidBelt mirrors mapMoon's structure: celestialIndex is the
+        # parent planet (II, III, …) and orbitIndex is the belt number around
+        # it. "Belt VII-1" reads the same as in-game and on dotlan, beats the
+        # legacy "Belt" label which collapsed every rock anomaly to one name.
+        if b.celestialIndex and b.orbitIndex:
+            label = f"Belt {_roman(b.celestialIndex)}-{b.orbitIndex}"
+        elif b.celestialIndex:
+            label = f"Belt {_roman(b.celestialIndex)}"
+        else:
+            label = "Belt"
+        _ensure(b.solarSystemID).append(
+            Celestial(label, float(b.positionX), float(b.positionY), float(b.positionZ))
+        )
 
     # Build stargate → destination system name lookup
     gate_dest_names: dict[int, str] = {}

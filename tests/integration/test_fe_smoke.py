@@ -10,12 +10,23 @@ def test_app_renders_header(page: Page, base_url: str) -> None:
     expect(page.get_by_role("heading", name="EVE CapNav")).to_be_visible()
 
 
-def test_ship_class_dropdown_populates(page: Page, base_url: str) -> None:
+def test_ship_picker_loads_cap_ships(page: Page, base_url: str) -> None:
+    """The typeahead replaces the old dropdown — clearing the input and
+    focusing it should fetch /api/cap-ships and render every seeded ship as
+    a selectable option. (With the default Archon selection the input filters
+    to just Archon, so we clear first to see the full unfiltered list.)"""
     page.goto(base_url)
-    # Wait for any option to render (means /api/ship-classes finished).
-    page.locator("option", has_text="Carrier (3.5 LY)").wait_for(state="attached")
-    expect(page.locator("option", has_text="Carrier (3.5 LY)")).to_have_count(1)
-    expect(page.locator("option", has_text="Jump Freighter")).to_have_count(1)
+    inp = page.get_by_test_id("ship-picker-input")
+    # Wait for the auto-select to populate the input, then clear it to see all.
+    expect(inp).not_to_have_value("", timeout=5_000)
+    inp.click()
+    inp.fill("")
+    expect(
+        page.locator('[data-testid="ship-picker-option"][data-ship-name="Archon"]')
+    ).to_have_count(1)
+    expect(
+        page.locator('[data-testid="ship-picker-option"][data-ship-name="Rhea"]')
+    ).to_have_count(1)
 
 
 def test_system_search_autocomplete(page: Page, base_url: str) -> None:

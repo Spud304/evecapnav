@@ -58,6 +58,26 @@ class IntelService:
     def compute_quiet_hours(aggregate_hourly: list[int]) -> tuple[int, int]:
         return find_quiet_hours(aggregate_hourly)
 
+    def compute_route_quiet_jumps(
+        self, system_ids: list[int]
+    ) -> tuple[tuple[int, int], list[float]]:
+        """Find the quietest UTC window by jump traffic across the route.
+
+        Sums each system's weekly hour-of-day jump profile (from
+        esi_activity.hourly_jumps), then picks the lowest 4-hour window.
+        Returns ((start_hour, end_hour), aggregated_24h_profile). Falls
+        back to (0, 4) if no jump data is cached.
+        """
+        danger = load_danger_data(self.instance_path)
+        aggregate = [0.0] * 24
+        for sid in system_ids:
+            hourly = danger.get(sid, {}).get("hourly_jumps") or [0] * 24
+            for h in range(24):
+                aggregate[h] += float(hourly[h])
+        # find_quiet_hours takes list[int]; round for the search but return floats
+        start, end = find_quiet_hours([int(round(v)) for v in aggregate])
+        return (start, end), aggregate
+
     def get_danger_data(self) -> dict[int, dict]:
         """Cached ESI kills/jumps/activity per system."""
         return load_danger_data(self.instance_path)
