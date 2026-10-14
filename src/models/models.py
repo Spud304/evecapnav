@@ -73,6 +73,8 @@ class MapAsteroidBelt(db.Model):
     positionX: Mapped[Optional[str]] = mapped_column(Text)
     positionY: Mapped[Optional[str]] = mapped_column(Text)
     positionZ: Mapped[Optional[str]] = mapped_column(Text)
+    celestialIndex: Mapped[Optional[int]] = mapped_column(Integer)
+    orbitIndex: Mapped[Optional[int]] = mapped_column(Integer)
 
 
 class MapStargate(db.Model):

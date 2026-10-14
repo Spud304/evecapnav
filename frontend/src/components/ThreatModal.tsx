@@ -20,7 +20,7 @@ export default function ThreatModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
       onClick={onClose}
     >
       <div
@@ -47,19 +47,19 @@ export default function ThreatModal({
 
         <div className="card-body">
           <div className="grid grid-cols-2 gap-3 mb-4 text-[12px]">
-            <div className="border border-[var(--color-line)] rounded-md p-3 bg-[#fafbfc]">
+            <div className="border border-[var(--color-line)] rounded-md p-3 bg-[var(--color-surface-2)]">
               <div className="text-[var(--color-muted)] text-[11px] uppercase tracking-wider">
                 Active PVPers
               </div>
               <div className="text-xl font-semibold">{stats.active_characters || 0}</div>
             </div>
-            <div className="border border-[var(--color-line)] rounded-md p-3 bg-[#fafbfc]">
+            <div className="border border-[var(--color-line)] rounded-md p-3 bg-[var(--color-surface-2)]">
               <div className="text-[var(--color-muted)] text-[11px] uppercase tracking-wider">
                 Active Corps
               </div>
               <div className="text-xl font-semibold">{stats.active_corps || 0}</div>
             </div>
-            <div className="border border-[var(--color-line)] rounded-md p-3 bg-[#fafbfc]">
+            <div className="border border-[var(--color-line)] rounded-md p-3 bg-[var(--color-surface-2)]">
               <div className="text-[var(--color-muted)] text-[11px] uppercase tracking-wider">
                 Ships Destroyed
               </div>
@@ -67,11 +67,11 @@ export default function ThreatModal({
                 {(stats.ships_destroyed || 0).toLocaleString()}
               </div>
             </div>
-            <div className="border border-[var(--color-line)] rounded-md p-3 bg-[#fafbfc]">
+            <div className="border border-[var(--color-line)] rounded-md p-3 bg-[var(--color-surface-2)]">
               <div className="text-[var(--color-muted)] text-[11px] uppercase tracking-wider">
                 Group Kills
               </div>
-              <div className="text-xl font-semibold">{stats.gang_ratio || '0'}%</div>
+              <div className="text-xl font-semibold">{stats.gang_ratio || '0%'}</div>
             </div>
           </div>
 

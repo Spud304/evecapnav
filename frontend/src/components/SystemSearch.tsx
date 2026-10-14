@@ -5,11 +5,14 @@ import { secColor } from '../utils/format';
 
 interface Props {
   label: string;
+  /** Optional initial input value (used by RouteControls when hydrating
+   *  saved preferences from localStorage). */
+  defaultValue?: string;
   onSelect: (id: number, name: string) => void;
 }
 
-export default function SystemSearch({ label, onSelect }: Props) {
-  const [query, setQuery] = useState('');
+export default function SystemSearch({ label, defaultValue = '', onSelect }: Props) {
+  const [query, setQuery] = useState(defaultValue);
   const [results, setResults] = useState<SystemSearchResult[]>([]);
   const [open, setOpen] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -57,12 +60,12 @@ export default function SystemSearch({ label, onSelect }: Props) {
         className="input"
       />
       {open && (
-        <div className="absolute z-50 left-0 right-0 top-full mt-px bg-white border border-[var(--color-line)] rounded-b-md shadow-md max-h-48 overflow-y-auto">
+        <div className="absolute z-50 left-0 right-0 top-full mt-px bg-[var(--color-paper)] border border-[var(--color-line)] rounded-b-md shadow-md max-h-48 overflow-y-auto">
           {results.map((s) => (
             <div
               key={s.id}
               onClick={() => handleSelect(s)}
-              className="px-3 py-1.5 cursor-pointer hover:bg-[#f6f7f9] text-[var(--color-ink)] text-[12px]"
+              className="px-3 py-1.5 cursor-pointer hover:bg-[var(--color-surface-2)] text-[var(--color-ink)] text-[12px]"
             >
               {s.name}{' '}
               <span

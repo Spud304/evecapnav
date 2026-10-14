@@ -15,6 +15,9 @@ export interface RouteStep {
   gate_count: number;
   sov_owner: string;
   edge_type?: string;
+  hourly_jumps?: number[]; // 24 floats, UTC index 0=00:00, weekly mean
+  wait_cooldown_minutes?: number;
+  wait_decay_minutes?: number;
 }
 
 export interface OptimizedRoute {
@@ -51,8 +54,16 @@ export interface RouteResult {
   optimized?: OptimizedRoute;
   zkill?: Record<number, ZkillSystemStats>;
   quiet_hours?: { start: number; end: number };
+  quiet_jumps?: { start: number; end: number; hourly: number[] };
   alternatives?: Record<string, AlternativeSystem[]>;
-  jump_data_window?: '1h' | '24h';
+  risk_score?: number;
+  risk_breakdown?: {
+    kills: number;
+    peak_jumps: number;
+    dead_ends: number;
+    hostile_systems: number;
+  };
+  total_fuel_isk?: number;
   error?: string;
 }
 
@@ -61,6 +72,16 @@ export interface ShipClass {
   base_range_ly: number;
   fatigue_multiplier: number;
   max_range_ly: number;
+}
+
+export interface CapShip {
+  type_id: number;
+  type_name: string;
+  group_id: number;
+  class_label: string;
+  base_range_ly: number;
+  fuel_per_ly: number;
+  fatigue_multiplier: number;
 }
 
 export interface SystemSearchResult {
